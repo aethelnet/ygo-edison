@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Auratic Prime // Deck Builder</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; padding: 20px; display: flex; box-sizing: border-box; }
+        h1 { color: #0f0; margin-top: 0; }
+        #left { flex: 1; margin-right: 400px; max-width: calc(100vw - 440px); box-sizing: border-box; }
+        #right { width: 360px; background: #111; padding: 15px; border: 1px solid #0f0; height: 92vh; position: fixed; right: 20px; top: 20px; overflow-y: auto; box-sizing: border-box; z-index: 100; }
+        
+        @media (max-width: 1100px) {
+            body { flex-direction: column; padding: 10px; }
+            #left { margin-right: 0; max-width: 100%; width: 100%; }
+            #right { position: relative; width: 100%; height: auto; top: 0; right: 0; margin-top: 20px; }
+        }
+        
+        .search-box { width: 100%; padding: 10px; background: #111; color: #0f0; border: 1px solid #0f0; font-family: monospace; font-size: 16px; margin-bottom: 20px; box-sizing: border-box; }
+        .btn { background: #000; color: #0f0; border: 1px solid #0f0; padding: 10px 20px; cursor: pointer; font-family: monospace; font-weight: bold; }
+        .btn:hover { background: #0f0; color: #000; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); gap: 8px; padding: 10px; background: #0a0a0a; border: 1px solid #222; box-sizing: border-box; transition: background 0.2s, border 0.2s; }
+        .grid.drag-over { border: 2px dashed #0f0 !important; background: #001a00 !important; }
+        
+        .card-wrap { position: relative; cursor: grab; aspect-ratio: 59/86; user-select: none; transition: transform 0.1s ease; }
+        .card-wrap:active { cursor: grabbing; }
+        .card-wrap.dragging { opacity: 0.35; transform: scale(0.92); }
+        .card-wrap.drag-hover-card { outline: 2px solid #0ff; }
+        .card-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; border: 1px solid #444; border-radius: 2px; pointer-events: none; }
+        .card-wrap:hover img { border: 2px solid #0f0; box-shadow: 0 0 10px #0f0; }
+        
+        /* Card Action Badges */
+        .card-badge-btn {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #555;
+            border-radius: 3px;
+            font-size: 11px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .card-wrap:hover .card-badge-btn { display: flex; }
+        .card-badge-del { top: 2px; right: 2px; color: #ff5555; }
+        .card-badge-del:hover { background: #ff5555; color: #000; border-color: #ff5555; }
+        .card-badge-swap { top: 2px; left: 2px; color: #00ffff; font-size: 11px; }
+        .card-badge-swap:hover { background: #00ffff; color: #000; border-color: #00ffff; }
+        
+        .deck-section { margin-top: 25px; border-top: 2px dashed #0f0; padding-top: 15px; }
+        .deck-count { float: right; color: #0ff; font-size: 1.1em; }
+        
+        #preview-img { width: 100%; display: block; margin-bottom: 15px; border: 1px solid #0f0; }
+        #preview-title { font-weight: bold; font-size: 1.2em; margin-bottom: 10px; color: #fff; }
+        #preview-stats { margin-bottom: 10px; color: #0ff; font-size: 1.05em; }
+        #preview-desc { font-size: 0.95em; line-height: 1.5; color: #eee; white-space: pre-line; word-break: break-word; background: #050505; padding: 10px; border-left: 3px solid #0f0; max-height: 30vh; overflow-y: auto; }
+        
+        /* Synergy Mini-Badges */
+        .synergy-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #0d0d0d;
+            border: 1px solid #222;
+            border-radius: 4px;
+            padding: 6px 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .synergy-badge:hover {
+            background: #112211;
+            border-color: #0f0;
+            transform: translateX(2px);
+        }
+        .synergy-thumb {
+            width: 32px;
+            height: 46px;
+            object-fit: cover;
+            border-radius: 2px;
+            border: 1px solid #333;
+            flex-shrink: 0;
+            display: block;
+        }
+        .synergy-details {
+            flex: 1;
+            min-width: 0;
+        }
+        .synergy-header {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 3px;
+            flex-wrap: wrap;
+        }
+        .synergy-name {
+            font-size: 11px;
+            font-weight: bold;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 175px;
+        }
+        .synergy-tag {
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .tag-archetype { background: rgba(241, 196, 15, 0.15); color: #f1c40f; border: 1px solid #f1c40f; }
+        .tag-search-target { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid #2ecc71; }
+        .tag-tuner-synchro { background: rgba(52, 152, 219, 0.15); color: #3498db; border: 1px solid #3498db; }
+        .tag-gy-trigger { background: rgba(155, 89, 182, 0.15); color: #9b59b6; border: 1px solid #9b59b6; }
+        .tag-edison-combo { background: rgba(230, 126, 34, 0.15); color: #e67e22; border: 1px solid #e67e22; }
+
+        .synergy-reason {
+            font-size: 10px;
+            color: #aaa;
+            line-height: 1.25;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .synergy-action {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .synergy-add-btn {
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .synergy-add-btn:hover {
+            background: #0f0;
+            color: #000;
+        }
+        .synergy-copies {
+            font-size: 9px;
+            color: #888;
+        }
+
+        .quick-help { font-size: 0.85em; color: #aaa; margin-bottom: 15px; line-height: 1.6; border: 1px solid #222; padding: 10px; background: #060606; }
+        
+        /* Test Hand Modal */
+        #test-hand-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        #test-hand-box { background: #111; border: 2px solid #0f0; border-radius: 6px; padding: 25px; max-width: 620px; width: 92%; text-align: center; box-shadow: 0 0 30px rgba(0, 255, 0, 0.3); }
+    </style>
+</head>
+<body>
+    <div id="left">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-wrap:wrap; gap:10px;">
+            <h1 style="margin:0;" data-i18n="page_title">Auratic Prime // Deck Builder</h1>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <button id="lang-toggle-btn" class="btn" onclick="toggleLanguage()" style="padding:4px 10px; font-size:12px; font-weight:bold; cursor:pointer;" title="Sprache wechseln / Switch Language">🌐 DE</button>
+                <div id="user-pilot-badge" style="background:#111; border:1px solid #0f0; padding:6px 12px; font-size:12px; color:#0f0;">
+                    [<span data-i18n="pilot_tag">PILOT</span>]: <span id="pilot-name">Pilot</span> <span id="pilot-id" style="color:#888;">(usr_pilot)</span>
+                </div>
+            </div>
+        </div>
+        <div id="edison-status-box" style="margin-bottom: 15px; padding: 10px 14px; background: #080808; border: 1px solid #333; font-size: 13px;">
+            <span style="color:#aaa;" data-i18n="banlist_loading">[EDISON BANLIST] Lade Status...</span>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom: 15px;">
+            <select id="deck-load" class="search-box" style="width:240px; margin:0;">
+                <option value="" data-i18n="load_deck_default">-- Load Deck --</option>
+            </select>
+            <button class="btn" onclick="loadDeck()" data-i18n="btn_load">📂 Load</button>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom: 15px; flex-wrap: wrap; align-items:center;">
+            <input type="text" id="deck-name" placeholder="Deck Name (z.B. Edison_Chaos)" data-i18n-placeholder="deck_name_placeholder" class="search-box" style="width:200px; margin:0;" />
+            <button class="btn" onclick="saveDeck()" data-i18n="btn_save">💾 Save</button>
+            <button class="btn" onclick="exportCurrentDeckYdk()" data-i18n="btn_export" data-i18n-title="btn_export_title" title="Aktuelles Deck als offizielle .ydk-Datei herunterladen">⬇️ Export .ydk</button>
+            <button class="btn" onclick="triggerYdkImport()" data-i18n="btn_import" data-i18n-title="btn_import_title" title=".ydk-Datei vom Computer laden">📤 Import .ydk</button>
+            <button class="btn" onclick="exportSideDeckOnly()" data-i18n="btn_side_export" data-i18n-title="btn_side_export_title" title="Nur Side-Deck als .ydk exportieren">📋 Side-Export</button>
+            <button class="btn" onclick="sortMainDeck()" data-i18n="btn_sort" data-i18n-title="btn_sort_title" title="Sortiert Monster nach Level/ATK, dann Zauber, dann Fallen">🔄 Sortieren</button>
+            <button class="btn" onclick="drawTestHand()" data-i18n="btn_test_hand" data-i18n-title="btn_test_hand_title" title="Zieht 5 zufällige Testkarten aus dem Main Deck">🎲 Test-Hand</button>
+            <button class="btn" id="btn-trash" onclick="clearDeck()" style="border-color:#e74c3c; color:#e74c3c;" data-i18n="btn_clear" data-i18n-title="btn_clear_title" title="Deck leeren oder Karte hierher ziehen zum Löschen">🗑️ Leeren</button>
+            <a href="/" class="btn" style="text-decoration:none; display:inline-block;" data-i18n="btn_back">⚔️ Back to Duel</a>
+            <input type="file" id="ydk-file-input" accept=".ydk,.txt" style="display:none;" onchange="handleYdkFileUpload(event)">
+        </div>
+        
+        <div class="quick-help" id="quick-help-banner" data-i18n-html="quick_help">
+            💡 <b style="color:#0f0;">Drag & Drop:</b> Ziehe Karten frei im Deck um, zwischen Zonen oder auf den 🗑️-Button zum Löschen!<br/>
+            ⚡ <b style="color:#0ff;">Maus-Shortcuts:</b> <b>Linksklick</b> = Zu Main/Extra | <b>Rechtsklick im Suchfeld</b> = Zu Side Deck | <b style="color:#ff5555;">Rechtsklick im Deck = SOFORT ENTFERNEN</b> | <b>Shift-Klick</b> = Main ⇄ Side tauschen.
+        </div>
+        
+        <!-- SEARCH & FILTER TOOLBAR -->
+        <div style="background:#0a0a0a; border:1px solid #222; padding:12px; margin-bottom:15px; box-sizing:border-box;">
+            <div style="display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+                <input type="text" id="search-input" class="search-box" style="margin:0; flex:1; min-width:220px;" placeholder="Kartenname oder Effekttext suchen... (Enter)" data-i18n-placeholder="search_placeholder" onkeyup="if(event.key === 'Enter') searchCards()" />
+                <button class="btn" onclick="searchCards()" data-i18n="btn_search">🔍 Suchen</button>
+                <button class="btn" onclick="toggleFilterPanel()" id="btn-toggle-filters" style="border-color:#0ff; color:#0ff;">⚙️ Filter [OFF]</button>
+                <button class="btn" onclick="resetFilters()" style="border-color:#666; color:#aaa;" data-i18n="btn_reset">✕ Reset</button>
+            </div>
+            
+            <div id="advanced-filters" style="display:none; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; padding-top:10px; border-top:1px dashed #333;">
+                <div>
+                    <label style="font-size:11px; color:#888; display:block; margin-bottom:3px;">Kartentyp:</label>
+                    <select id="filter-card-type" class="search-box" style="padding:6px; font-size:12px; margin:0; width:100%;" onchange="searchCards()">
+                        <option value="">-- Alle Typen --</option>
+                        <option value="monster">Monster (Alle)</option>
+                        <option value="normal">Normales Monster</option>
+                        <option value="effect">Effektmonster</option>
+                        <option value="fusion">Fusionsmonster</option>
+                        <option value="ritual">Ritualmonster</option>
+                        <option value="synchro">Synchromonster</option>
+                        <option value="tuner">Empfänger (Tuner)</option>
+                        <option value="spell">Zauber (Spell)</option>
+                        <option value="trap">Falle (Trap)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; color:#888; display:block; margin-bottom:3px;">Attribut:</label>
+                    <select id="filter-attribute" class="search-box" style="padding:6px; font-size:12px; margin:0; width:100%;" onchange="searchCards()">
+                        <option value="">-- Alle Attribute --</option>
+                        <option value="1">🌍 ERDE (Earth)</option>
+                        <option value="2">💧 WASSER (Water)</option>
+                        <option value="4">🔥 FEUER (Fire)</option>
+                        <option value="8">💨 WIND (Wind)</option>
+                        <option value="16">✨ LICHT (Light)</option>
+                        <option value="32">🌑 FINSTERNIS (Dark)</option>
+                        <option value="64">⚡ GÖTTLICH (Divine)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; color:#888; display:block; margin-bottom:3px;">Monster-Typ:</label>
+                    <select id="filter-race" class="search-box" style="padding:6px; font-size:12px; margin:0; width:100%;" onchange="searchCards()">
+                        <option value="">-- Alle Typen --</option>
+                        <option value="1">Krieger (Warrior)</option>
+                        <option value="2">Hexer (Spellcaster)</option>
+                        <option value="4">Fee (Fairy)</option>
+                        <option value="8">Unterweltler (Fiend)</option>
+                        <option value="16">Zombie</option>
+                        <option value="32">Maschine (Machine)</option>
+                        <option value="64">Aqua</option>
+                        <option value="128">Pyro</option>
+                        <option value="256">Fels (Rock)</option>
+                        <option value="512">Geflügeltes Ungeheuer</option>
+                        <option value="1024">Pflanze (Plant)</option>
+                        <option value="2048">Insekt (Insect)</option>
+                        <option value="4096">Donner (Thunder)</option>
+                        <option value="8192">Drache (Dragon)</option>
+                        <option value="16384">Ungeheuer (Beast)</option>
+                        <option value="32768">Ungeheuer-Krieger</option>
+                        <option value="65536">Dinosaurier (Dinosaur)</option>
+                        <option value="131072">Fisch (Fish)</option>
+                        <option value="262144">Seeschlange (Sea Serpent)</option>
+                        <option value="524288">Reptil (Reptile)</option>
+                        <option value="1048576">Psi (Psychic)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; color:#888; display:block; margin-bottom:3px;">Stufe / Rang:</label>
+                    <select id="filter-level" class="search-box" style="padding:6px; font-size:12px; margin:0; width:100%;" onchange="searchCards()">
+                        <option value="">-- Alle Level --</option>
+                        <option value="1">⭐ Level 1</option>
+                        <option value="2">⭐ Level 2</option>
+                        <option value="3">⭐ Level 3</option>
+                        <option value="4">⭐ Level 4</option>
+                        <option value="5">⭐ Level 5</option>
+                        <option value="6">⭐ Level 6</option>
+                        <option value="7">⭐ Level 7</option>
+                        <option value="8">⭐ Level 8</option>
+                        <option value="9">⭐ Level 9</option>
+                        <option value="10">⭐ Level 10</option>
+                        <option value="11">⭐ Level 11</option>
+                        <option value="12">⭐ Level 12</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11px; color:#888; display:block; margin-bottom:3px;">ATK (Min - Max):</label>
+                    <div style="display:flex; gap:4px;">
+                        <input type="number" id="filter-min-atk" class="search-box" style="padding:6px; font-size:12px; margin:0; width:50%;" placeholder="Min" onkeyup="if(event.key === 'Enter') searchCards()" />
+                        <input type="number" id="filter-max-atk" class="search-box" style="padding:6px; font-size:12px; margin:0; width:50%;" placeholder="Max" onkeyup="if(event.key === 'Enter') searchCards()" />
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size:11px; color:#888; display:block; margin-bottom:3px;">DEF (Min - Max):</label>
+                    <div style="display:flex; gap:4px;">
+                        <input type="number" id="filter-min-def" class="search-box" style="padding:6px; font-size:12px; margin:0; width:50%;" placeholder="Min" onkeyup="if(event.key === 'Enter') searchCards()" />
+                        <input type="number" id="filter-max-def" class="search-box" style="padding:6px; font-size:12px; margin:0; width:50%;" placeholder="Max" onkeyup="if(event.key === 'Enter') searchCards()" />
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; padding-top:16px;">
+                    <input type="checkbox" id="filter-edison-only" checked onchange="searchCards()" style="accent-color:#0f0; cursor:pointer;" />
+                    <label for="filter-edison-only" style="font-size:12px; color:#0f0; cursor:pointer; user-select:none;">Nur Edison (kein Xyz/Link)</label>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <h3 style="margin:0;"><span data-i18n="search_heading">Suchergebnisse</span> <span data-i18n="search_hint" style="font-size: 0.8em; color: #888; font-weight: normal;">(Linksklick: Main/Extra | Rechtsklick: Side Deck | Drag: Deck)</span></h3>
+            <span id="search-count-badge" style="color:#0ff; font-size:12px;"></span>
+        </div>
+        <div id="search-results" class="grid" style="min-height: 120px; border: 1px dashed #333; padding: 10px;"></div>
+        
+        <div class="deck-section">
+            <h3><span data-i18n="sec_main">Main Deck</span> <span class="deck-count" id="main-count">0 / 60</span></h3>
+            <div id="main-deck" class="grid" style="min-height: 150px;"></div>
+        </div>
+        
+        <div class="deck-section">
+            <h3><span data-i18n="sec_extra">Extra Deck</span> <span class="deck-count" id="extra-count">0 / 15</span></h3>
+            <div id="extra-deck" class="grid" style="min-height: 120px;"></div>
+        </div>
+
+        <div class="deck-section">
+            <h3><span data-i18n="sec_side">Side Deck</span> <span class="deck-count" id="side-count">0 / 15</span></h3>
+            <div id="side-deck" class="grid" style="min-height: 120px;"></div>
+        </div>
+    </div>
+    
+    <div id="right">
+        <img id="preview-img" src="https://images.ygoprodeck.com/images/cards/back.jpg" />
+        <div id="preview-title" data-i18n="preview_hover">Hover over a card...</div>
+        <div id="preview-stats"></div>
+        <div id="preview-desc"></div>
+
+        <!-- [🧬 SYNERGIEN & DECK-MUTATIONEN] -->
+        <div id="preview-synergies-section" style="margin-top: 15px; border-top: 1px dashed #333; padding-top: 12px; display: none;">
+            <div style="font-size: 12px; font-weight: bold; color: #0f0; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span data-i18n="synergy_heading">🧬 SYNERGIEN & DECK-MUTATIONEN</span>
+                <span id="synergy-status" style="font-size: 10px; color: #888;"></span>
+            </div>
+            <div id="preview-synergies-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let mainDeck = [];
+        let extraDeck = [];
+        let sideDeck = [];
+        let draggedItem = null; // { source: "search"|"main"|"extra"|"side", index: number, card: object }
+        let currentPreviewCard = null;
+        let synergyFetchTimeout = null;
+
+        const isExtra = (typeFlag) => {
+            return (typeFlag & (0x40 | 0x2000 | 0x800000 | 0x4000000)) !== 0;
+        };
+
+        const addCardToDeck = (c) => {
+            if (isExtra(c.type)) {
+                if (extraDeck.length < 15) {
+                    extraDeck.push(c);
+                } else {
+                    alert("Extra Deck ist voll (max. 15)!");
+                    return false;
+                }
+            } else {
+                if (mainDeck.length < 60) {
+                    mainDeck.push(c);
+                } else {
+                    alert("Main Deck ist voll (max. 60)!");
+                    return false;
+                }
+            }
+            updateDecks();
+            if (currentPreviewCard) {
+                loadSynergies(currentPreviewCard);
+            }
+            return true;
+        };
+
+        const loadSynergies = (card) => {
+            const section = document.getElementById('preview-synergies-section');
+            const list = document.getElementById('preview-synergies-list');
+            const status = document.getElementById('synergy-status');
+            if (!section || !list || !card) return;
+
+            section.style.display = 'block';
+            status.innerText = 'Lade...';
+            status.style.color = '#888';
+
+            if (synergyFetchTimeout) clearTimeout(synergyFetchTimeout);
+            synergyFetchTimeout = setTimeout(() => {
+                const currentDeckIds = [...mainDeck, ...extraDeck, ...sideDeck].map(x => x.id).join(",");
+                fetch(`/api/cards/${card.id}/synergies?current_deck_ids=${encodeURIComponent(currentDeckIds)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!currentPreviewCard || currentPreviewCard.id !== card.id) return;
+                        renderSynergiesList(data.synergies || []);
+                    })
+                    .catch(err => {
+                        if (!currentPreviewCard || currentPreviewCard.id !== card.id) return;
+                        status.innerText = 'Offline';
+                        status.style.color = '#ff5555';
+                    });
+            }, 80);
+        };
+
+        const renderSynergiesList = (synergies) => {
+            const list = document.getElementById('preview-synergies-list');
+            const status = document.getElementById('synergy-status');
+            if (!list) return;
+            list.innerHTML = '';
+            status.innerText = `${synergies.length} Treffer`;
+            status.style.color = '#0ff';
+
+            if (synergies.length === 0) {
+                list.innerHTML = '<div style="font-size:11px; color:#666; font-style:italic; padding:4px 0;">Keine spezifischen Edison-Kombos registriert.</div>';
+                return;
+            }
+
+            synergies.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'synergy-badge';
+                el.title = `1-Click: Zu Deck hinzufügen\nRechtsklick: Vorschau anzeigen\n${s.name} (${s.copies_in_deck}/${s.max_allowed} im Deck)`;
+
+                let tagClass = 'tag-archetype';
+                if (s.tag === '[SEARCH-TARGET]') tagClass = 'tag-search-target';
+                else if (s.tag === '[TUNER/SYNCHRO]') tagClass = 'tag-tuner-synchro';
+                else if (s.tag === '[GY-TRIGGER]') tagClass = 'tag-gy-trigger';
+                else if (s.tag === '[EDISON-COMBO]') tagClass = 'tag-edison-combo';
+
+                el.innerHTML = `
+                    <img class="synergy-thumb" src="https://images.ygoprodeck.com/images/cards_small/${s.id}.jpg" onerror="this.src='https://images.ygoprodeck.com/images/cards/back.jpg'" />
+                    <div class="synergy-details">
+                        <div class="synergy-header">
+                            <span class="synergy-name">${s.name}</span>
+                            <span class="synergy-tag ${tagClass}">${s.tag}</span>
+                        </div>
+                        <div class="synergy-reason">${s.reason || ''}</div>
+                    </div>
+                    <div class="synergy-action">
+                        <button class="synergy-add-btn" title="Zu Deck hinzufügen">+ Add</button>
+                        <span class="synergy-copies">${s.copies_in_deck}/${s.max_allowed}</span>
+                    </div>
+                `;
+
+                // Right click on mini badge previews that card
+                el.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    renderPreview(s);
+                };
+
+                // Left click on badge or +Add button adds to deck
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    addCardToDeck(s);
+                };
+
+                list.appendChild(el);
+            });
+        };
+
+        const renderPreview = (c) => {
+            currentPreviewCard = c;
+            const pImg = document.getElementById('preview-img');
+            pImg.onerror = () => {
+                pImg.onerror = null;
+                pImg.src = 'https://images.ygoprodeck.com/images/cards/back.jpg';
+            };
+            pImg.src = `https://images.ygoprodeck.com/images/cards/${c.id}.jpg`;
+            document.getElementById('preview-title').innerText = c.name;
+            const isTrap = (c.type & 4) !== 0;
+            const isSpell = (c.type & 2) !== 0;
+            const isMonster = isExtra(c.type) || (c.type & 1);
+            if (isTrap) {
+                document.getElementById('preview-stats').innerHTML = '<span style="color:#e056fd; font-weight:bold; font-size:1.1em;">🟪 [FALLE / TRAP CARD]</span>';
+            } else if (isSpell) {
+                document.getElementById('preview-stats').innerHTML = '<span style="color:#2ecc71; font-weight:bold; font-size:1.1em;">🟩 [ZAUBER / SPELL CARD]</span>';
+            } else if (isMonster) {
+                document.getElementById('preview-stats').innerHTML = `<span style="color:#f1c40f; font-weight:bold;">⚔️ ATK: ${c.atk !== undefined ? c.atk : 0} | 🛡️ DEF: ${c.def !== undefined ? c.def : 0} | ⭐ LVL: ${c.level || '?'}</span>`;
+            } else {
+                document.getElementById('preview-stats').innerText = "Card #" + c.id;
+            }
+            document.getElementById('preview-desc').innerText = c.desc || "Keine Effektbeschreibung vorhanden.";
+
+            loadSynergies(c);
+        };
+
+        // Create card DOM element with Drag-and-Drop and Quick badges
+        const createCardEl = (c, section, index = null) => {
+            const w = document.createElement("div");
+            w.className = "card-wrap";
+            w.draggable = true;
+            
+            const img = document.createElement("img");
+            img.src = `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
+            img.onerror = () => {
+                img.onerror = () => {
+                    img.onerror = null;
+                    img.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='116' viewBox='0 0 80 116'><rect width='100%' height='100%' fill='%23111' stroke='%230f0' stroke-width='2'/><text x='50%' y='45%' fill='%230f0' font-family='monospace' font-size='11' text-anchor='middle'>YGO</text><text x='50%' y='65%' fill='%23666' font-family='monospace' font-size='8' text-anchor='middle'>NO COVER</text></svg>";
+                };
+                img.src = 'https://images.ygoprodeck.com/images/cards/back.jpg';
+            };
+            w.appendChild(img);
+
+            // Drag Start & End
+            w.ondragstart = (e) => {
+                draggedItem = { source: section, index: index, card: c };
+                w.classList.add("dragging");
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", JSON.stringify({ source: section, index: index, cardId: c.id }));
+            };
+            w.ondragend = () => {
+                w.classList.remove("dragging");
+                draggedItem = null;
+                document.querySelectorAll('#left .grid').forEach(el => el.classList.remove('drag-over'));
+                document.querySelectorAll('#left .card-wrap').forEach(el => el.classList.remove('drag-hover-card'));
+            };
+
+            // In-deck card specific features (Main, Extra, Side)
+            if (section !== "search") {
+                // Drop directly onto another card to insert/reorder
+                w.ondragover = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    w.classList.add("drag-hover-card");
+                };
+                w.ondragleave = (e) => {
+                    e.stopPropagation();
+                    w.classList.remove("drag-hover-card");
+                };
+                w.ondrop = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    w.classList.remove("drag-hover-card");
+                    handleDrop(section, index);
+                };
+
+                // Remove badge button (top-right)
+                const delBtn = document.createElement("div");
+                delBtn.className = "card-badge-btn card-badge-del";
+                delBtn.title = "Aus dem Deck entfernen";
+                delBtn.innerText = "✕";
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    removeCardAt(section, index);
+                };
+                w.appendChild(delBtn);
+
+                // Swap badge button (top-left) - switches between Main/Extra <-> Side
+                const swapBtn = document.createElement("div");
+                swapBtn.className = "card-badge-btn card-badge-swap";
+                swapBtn.title = section === "side" ? "Ins Main/Extra Deck verschieben" : "Ins Side Deck verschieben";
+                swapBtn.innerText = "⇄";
+                swapBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    swapCardSide(section, index);
+                };
+                w.appendChild(swapBtn);
+
+                // Right click on card in deck -> IMMEDIATELY REMOVE from deck (EDOPro/DuelingBook invariant)
+                w.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    removeCardAt(section, index);
+                };
+
+                // Left click on card in deck -> Shift or Alt swaps with Side Deck; normal click previews card
+                w.onclick = (e) => {
+                    if (e.shiftKey || e.altKey) {
+                        swapCardSide(section, index);
+                    } else {
+                        renderPreview(c);
+                    }
+                };
+            } else {
+                // Left click -> Add to Main or Extra
+                w.onclick = () => {
+                    addCardToDeck(c);
+                };
+
+                // Right click on search result -> Add to Side Deck
+                w.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    if (sideDeck.length < 15) {
+                        sideDeck.push(c);
+                        updateDecks();
+                    } else {
+                        alert("Side Deck ist voll (max. 15)!");
+                    }
+                };
+            }
+            
+            w.onmouseover = () => renderPreview(c);
+            return w;
+        };
+
+        // Remove card at specific index
+        function removeCardAt(section, index) {
+            if (section === "main") mainDeck.splice(index, 1);
+            else if (section === "extra") extraDeck.splice(index, 1);
+            else if (section === "side") sideDeck.splice(index, 1);
+            updateDecks();
+        }
+
+        // Quick Swap between Main/Extra and Side Deck
+        function swapCardSide(section, index) {
+            if (section === "main") {
+                if (sideDeck.length >= 15) { alert("Side Deck ist voll (max. 15)!"); return; }
+                const [card] = mainDeck.splice(index, 1);
+                sideDeck.push(card);
+            } else if (section === "extra") {
+                if (sideDeck.length >= 15) { alert("Side Deck ist voll (max. 15)!"); return; }
+                const [card] = extraDeck.splice(index, 1);
+                sideDeck.push(card);
+            } else if (section === "side") {
+                const card = sideDeck[index];
+                if (isExtra(card.type)) {
+                    if (extraDeck.length >= 15) { alert("Extra Deck ist voll (max. 15)!"); return; }
+                    sideDeck.splice(index, 1);
+                    extraDeck.push(card);
+                } else {
+                    if (mainDeck.length >= 60) { alert("Main Deck ist voll (max. 60)!"); return; }
+                    sideDeck.splice(index, 1);
+                    mainDeck.push(card);
+                }
+            }
+            updateDecks();
+        }
+
+        // Unified Drop Handler for Moving, Inserting & Reordering
+        function handleDrop(targetSection, targetIndex = null) {
+            if (!draggedItem) return;
+            const { source, index, card } = draggedItem;
+            const isExtraCard = isExtra(card.type);
+
+            // Validation: Extra Deck only accepts Extra monsters
+            if (targetSection === "extra" && !isExtraCard) {
+                alert("Nur Fusions-, Synchro-, Xyz- und Link-Monster dürfen ins Extra Deck!");
+                return;
+            }
+            // Main Deck cannot accept Extra monsters
+            if (targetSection === "main" && isExtraCard) {
+                alert("Extra-Deck-Monster können nicht ins Main Deck!");
+                return;
+            }
+
+            const targetList = targetSection === "main" ? mainDeck : (targetSection === "extra" ? extraDeck : sideDeck);
+            const maxLimit = targetSection === "main" ? 60 : 15;
+
+            if (source === "search") {
+                if (targetList.length >= maxLimit) {
+                    alert(`${targetSection.toUpperCase()} Deck ist voll (max. ${maxLimit})!`);
+                    return;
+                }
+                if (targetIndex === null || targetIndex >= targetList.length) {
+                    targetList.push(card);
+                } else {
+                    targetList.splice(targetIndex, 0, card);
+                }
+            } else {
+                const sourceList = source === "main" ? mainDeck : (source === "extra" ? extraDeck : sideDeck);
+                if (source === targetSection) {
+                    // Reorder within the same deck
+                    if (targetIndex === null || targetIndex === index) return;
+                    const [moved] = sourceList.splice(index, 1);
+                    let insertAt = targetIndex;
+                    sourceList.splice(insertAt, 0, moved);
+                } else {
+                    // Moving between different decks
+                    if (targetList.length >= maxLimit) {
+                        alert(`${targetSection.toUpperCase()} Deck ist voll (max. ${maxLimit})!`);
+                        return;
+                    }
+                    const [moved] = sourceList.splice(index, 1);
+                    let insertAt = targetIndex !== null ? targetIndex : targetList.length;
+                    targetList.splice(insertAt, 0, moved);
+                }
+            }
+            updateDecks();
+        }
+
+        // Setup drop listeners on container grids
+        function setupGridDropZone(elId, section) {
+            const el = document.getElementById(elId);
+            el.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                el.classList.add("drag-over");
+            };
+            el.ondragleave = (e) => {
+                el.classList.remove("drag-over");
+            };
+            el.ondrop = (e) => {
+                e.preventDefault();
+                el.classList.remove("drag-over");
+                handleDrop(section, null);
+            };
+        }
+
+        setupGridDropZone("main-deck", "main");
+        setupGridDropZone("extra-deck", "extra");
+        setupGridDropZone("side-deck", "side");
+
+        // Trash button drop zone: dropping any deck card here removes it
+        const trashBtn = document.getElementById("btn-trash");
+        if (trashBtn) {
+            trashBtn.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                trashBtn.style.background = "#e74c3c";
+                trashBtn.style.color = "#000";
+            };
+            trashBtn.ondragleave = () => {
+                trashBtn.style.background = "#000";
+                trashBtn.style.color = "#e74c3c";
+            };
+            trashBtn.ondrop = (e) => {
+                e.preventDefault();
+                trashBtn.style.background = "#000";
+                trashBtn.style.color = "#e74c3c";
+                if (draggedItem && draggedItem.source !== "search") {
+                    removeCardAt(draggedItem.source, draggedItem.index);
+                }
+            };
+        }
+
+        // User Pilot Identity Setup
+        let currentUserId = localStorage.getItem("ygo_user_id");
+        if (!currentUserId || currentUserId === "usr_stefan" || currentUserId === "usr_stefan_001") {
+            currentUserId = "usr_pilot";
+            localStorage.setItem("ygo_user_id", currentUserId);
+        }
+        let currentUserName = localStorage.getItem("ygo_user_name");
+        if (!currentUserName || currentUserName === "Stefan") {
+            currentUserName = "Pilot";
+            localStorage.setItem("ygo_user_name", currentUserName);
+        }
+        const pNameEl = document.getElementById("pilot-name");
+        const pIdEl = document.getElementById("pilot-id");
+        if (pNameEl) pNameEl.innerText = currentUserName;
+        if (pIdEl) pIdEl.innerText = `(${currentUserId})`;
+
+        // Internationalization (DE / EN UI Switcher)
+        const I18N_DECK = {
+            de: {
+                page_title: "Auratic Prime // Deck Builder",
+                pilot_tag: "PILOT",
+                banlist_loading: "[EDISON BANLIST] Lade Status...",
+                load_deck_default: "-- Deck laden --",
+                btn_load: "📂 Laden",
+                deck_name_placeholder: "Deck Name (z.B. Edison_Chaos)",
+                btn_save: "💾 Speichern",
+                btn_export: "⬇️ Export .ydk",
+                btn_export_title: "Aktuelles Deck als offizielle .ydk-Datei herunterladen",
+                btn_import: "📤 Import .ydk",
+                btn_import_title: ".ydk-Datei vom Computer laden",
+                btn_side_export: "📋 Side-Export",
+                btn_side_export_title: "Nur Side-Deck als .ydk exportieren",
+                btn_sort: "🔄 Sortieren",
+                btn_sort_title: "Sortiert Monster nach Level/ATK, dann Zauber, dann Fallen",
+                btn_test_hand: "🎲 Test-Hand",
+                btn_test_hand_title: "Zieht 5 zufällige Testkarten aus dem Main Deck",
+                btn_clear: "🗑️ Leeren",
+                btn_clear_title: "Deck leeren oder Karte hierher ziehen zum Löschen",
+                btn_back: "⚔️ Zum Duell",
+                quick_help: '💡 <b style="color:#0f0;">Drag & Drop:</b> Ziehe Karten frei im Deck um, zwischen Zonen oder auf den 🗑️-Button zum Löschen!<br/>⚡ <b style="color:#0ff;">Maus-Shortcuts:</b> <b>Linksklick</b> = Zu Main/Extra | <b>Rechtsklick im Suchfeld</b> = Zu Side Deck | <b style="color:#ff5555;">Rechtsklick im Deck = SOFORT ENTFERNEN</b> | <b>Shift-Klick</b> = Main ⇄ Side tauschen.',
+                search_placeholder: "Kartenname oder Effekttext suchen... (Enter)",
+                btn_search: "🔍 Suchen",
+                btn_reset: "✕ Reset",
+                search_heading: "Suchergebnisse",
+                search_hint: "(Linksklick: Main/Extra | Rechtsklick: Side Deck | Drag: Deck)",
+                sec_main: "Main Deck",
+                sec_extra: "Extra Deck",
+                sec_side: "Side Deck",
+                preview_hover: "Hover over a card...",
+                synergy_heading: "🧬 SYNERGIEN & DECK-MUTATIONEN",
+                test_hand_heading: "🎲 Test-Hand (5 Karten)",
+                test_hand_sub: "Simulierte Eröffnungshand aus deinem aktuellen Main Deck:",
+                btn_redraw: "🎲 Neu ziehen (Mulligan)",
+                btn_close: "✕ Schließen",
+                lang_toggle: "🌐 DE"
+            },
+            en: {
+                page_title: "Auratic Prime // Deck Builder",
+                pilot_tag: "PILOT",
+                banlist_loading: "[EDISON BANLIST] Loading status...",
+                load_deck_default: "-- Load Deck --",
+                btn_load: "📂 Load",
+                deck_name_placeholder: "Deck Name (e.g. Edison_Chaos)",
+                btn_save: "💾 Save",
+                btn_export: "⬇️ Export .ydk",
+                btn_export_title: "Download current deck as official .ydk file",
+                btn_import: "📤 Import .ydk",
+                btn_import_title: "Load .ydk file from computer",
+                btn_side_export: "📋 Side-Export",
+                btn_side_export_title: "Export side deck only as .ydk",
+                btn_sort: "🔄 Sort",
+                btn_sort_title: "Sorts monsters by level/ATK, then spells, then traps",
+                btn_test_hand: "🎲 Test Hand",
+                btn_test_hand_title: "Draws 5 random opening cards from main deck",
+                btn_clear: "🗑️ Clear",
+                btn_clear_title: "Clear deck or drag card here to remove",
+                btn_back: "⚔️ Back to Duel",
+                quick_help: '💡 <b style="color:#0f0;">Drag & Drop:</b> Freely drag cards in deck, between zones, or onto 🗑️ button to remove!<br/>⚡ <b style="color:#0ff;">Mouse Shortcuts:</b> <b>Left-click</b> = Add to Main/Extra | <b>Right-click in search</b> = Add to Side Deck | <b style="color:#ff5555;">Right-click in deck = REMOVE INSTANTLY</b> | <b>Shift-Click</b> = Swap Main ⇄ Side.',
+                search_placeholder: "Search card name or effect text... (Enter)",
+                btn_search: "🔍 Search",
+                btn_reset: "✕ Reset",
+                search_heading: "Search Results",
+                search_hint: "(Left-click: Main/Extra | Right-click: Side Deck | Drag: Deck)",
+                sec_main: "Main Deck",
+                sec_extra: "Extra Deck",
+                sec_side: "Side Deck",
+                preview_hover: "Hover over a card...",
+                synergy_heading: "🧬 SYNERGIES & DECK MUTATIONS",
+                test_hand_heading: "🎲 Test Hand (5 Cards)",
+                test_hand_sub: "Simulated opening hand drawn from current Main Deck:",
+                btn_redraw: "🎲 Redraw (Mulligan)",
+                btn_close: "✕ Close",
+                lang_toggle: "🌐 EN"
+            }
+        };
+
+        function setLanguage(lang) {
+            if (!I18N_DECK[lang]) lang = "de";
+            localStorage.setItem("ygo_lang", lang);
+            const t = I18N_DECK[lang];
+            
+            const btn = document.getElementById("lang-toggle-btn");
+            if (btn) btn.innerText = t.lang_toggle;
+
+            document.querySelectorAll("[data-i18n]").forEach(el => {
+                const key = el.getAttribute("data-i18n");
+                if (t[key] !== undefined) el.innerText = t[key];
+            });
+            document.querySelectorAll("[data-i18n-html]").forEach(el => {
+                const key = el.getAttribute("data-i18n-html");
+                if (t[key] !== undefined) el.innerHTML = t[key];
+            });
+            document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+                const key = el.getAttribute("data-i18n-placeholder");
+                if (t[key] !== undefined) el.placeholder = t[key];
+            });
+            document.querySelectorAll("[data-i18n-title]").forEach(el => {
+                const key = el.getAttribute("data-i18n-title");
+                if (t[key] !== undefined) el.title = t[key];
+            });
+        }
+
+        function toggleLanguage() {
+            const current = localStorage.getItem("ygo_lang") || "de";
+            const next = current === "de" ? "en" : "de";
+            setLanguage(next);
+        }
+
+        // Initialize language
+        setLanguage(localStorage.getItem("ygo_lang") || "de");
+
+        let valDebounce = null;
+        function updateEdisonLegality() {
+            clearTimeout(valDebounce);
+            valDebounce = setTimeout(async () => {
+                const statusBox = document.getElementById("edison-status-box");
+                if (!statusBox) return;
+                try {
+                    const res = await fetch(`${apiBase}/validate_deck`, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            main: mainDeck.map(c => c.id),
+                            extra: extraDeck.map(c => c.id),
+                            side: sideDeck.map(c => c.id)
+                        })
+                    });
+                    const val = await res.json();
+                    if (val.is_legal) {
+                        statusBox.innerHTML = `<span style="color:#0f0; font-weight:bold;">[EDISON LEGAL]</span> <span style="color:#aaa;">Main: ${val.main_count}/40-60 | Extra: ${val.extra_count}/15 | Side: ${val.side_count}/15 (March/April 2010 konform)</span>`;
+                        statusBox.style.borderColor = "#0f0";
+                        statusBox.style.background = "#001a00";
+                    } else {
+                        const topViolations = (val.violations || []).slice(0, 3).map(v => v.message).join(" | ");
+                        const more = (val.violations || []).length > 3 ? ` (+${val.violations.length - 3} weitere)` : "";
+                        statusBox.innerHTML = `<span style="color:#e74c3c; font-weight:bold;">[EDISON ILLEGAL]</span> <span style="color:#ff8888; font-size:11px;">${topViolations}${more}</span>`;
+                        statusBox.style.borderColor = "#e74c3c";
+                        statusBox.style.background = "#1a0000";
+                    }
+                } catch(e) {
+                    console.error("Validation error:", e);
+                }
+            }, 250);
+        }
+
+        const updateDecks = () => {
+            const m = document.getElementById("main-deck");
+            const e = document.getElementById("extra-deck");
+            const s = document.getElementById("side-deck");
+            m.innerHTML = ""; e.innerHTML = ""; s.innerHTML = "";
+            
+            document.getElementById("main-count").innerText = `${mainDeck.length} / 60`;
+            document.getElementById("extra-count").innerText = `${extraDeck.length} / 15`;
+            document.getElementById("side-count").innerText = `${sideDeck.length} / 15`;
+            
+            mainDeck.forEach((c, idx) => {
+                m.appendChild(createCardEl(c, "main", idx));
+            });
+            
+            extraDeck.forEach((c, idx) => {
+                e.appendChild(createCardEl(c, "extra", idx));
+            });
+
+            sideDeck.forEach((c, idx) => {
+                s.appendChild(createCardEl(c, "side", idx));
+            });
+
+            updateEdisonLegality();
+        };
+
+        const apiBase = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || !window.location.hostname)
+            ? "http://127.0.0.1:8001/api"
+            : "/api";
+
+        // Fetch decks grouped by User vs Community
+        function refreshDeckList(selectedIdentifier) {
+            fetch(`${apiBase}/decks?user_id=${encodeURIComponent(currentUserId)}`)
+            .then(res => res.json())
+            .then(data => {
+                const sel = document.getElementById("deck-load");
+                sel.innerHTML = '<option value="">-- Load Deck --</option>';
+                
+                if (data.my_decks && data.my_decks.length > 0) {
+                    const myGroup = document.createElement("optgroup");
+                    myGroup.label = "Meine Decks (Account)";
+                    data.my_decks.forEach(d => {
+                        const opt = document.createElement("option");
+                        opt.value = d.deck_id || d.deck_name;
+                        const edisonTag = d.is_edison_legal ? " [EDISON]" : "";
+                        opt.innerText = `${d.deck_name}${edisonTag}`;
+                        if (selectedIdentifier && (d.deck_name === selectedIdentifier || d.deck_id === selectedIdentifier)) opt.selected = true;
+                        myGroup.appendChild(opt);
+                    });
+                    sel.appendChild(myGroup);
+                }
+                
+                if (data.community_decks && data.community_decks.length > 0) {
+                    const commGroup = document.createElement("optgroup");
+                    commGroup.label = "Community & System Decks";
+                    data.community_decks.forEach(d => {
+                        const opt = document.createElement("option");
+                        opt.value = d.deck_id || d.deck_name;
+                        const edisonTag = d.is_edison_legal ? " [EDISON]" : "";
+                        const author = d.user_name ? ` (${d.user_name})` : "";
+                        opt.innerText = `${d.deck_name}${author}${edisonTag}`;
+                        if (selectedIdentifier && (d.deck_name === selectedIdentifier || d.deck_id === selectedIdentifier)) opt.selected = true;
+                        commGroup.appendChild(opt);
+                    });
+                    sel.appendChild(commGroup);
+                }
+            })
+            .catch(err => console.error("Error loading decks:", err));
+        }
+        refreshDeckList();
+        
+        async function loadDeck() {
+            const identifier = document.getElementById("deck-load").value;
+            if(!identifier) return;
+            const res = await fetch(`${apiBase}/deck/${encodeURIComponent(identifier)}?user_id=${encodeURIComponent(currentUserId)}`);
+            const data = await res.json();
+            if(data.error) { alert(data.error); return; }
+            mainDeck = data.main || [];
+            extraDeck = data.extra || [];
+            sideDeck = data.side || [];
+            document.getElementById("deck-name").value = data.name || identifier;
+            updateDecks();
+        }
+
+        // FILTER PANEL TOGGLE & RESET
+        function toggleFilterPanel() {
+            const p = document.getElementById("advanced-filters");
+            const btn = document.getElementById("btn-toggle-filters");
+            if (p.style.display === "none" || !p.style.display) {
+                p.style.display = "grid";
+                btn.innerText = "⚙️ Filter [ON]";
+                btn.style.borderColor = "#0f0";
+                btn.style.color = "#0f0";
+            } else {
+                p.style.display = "none";
+                btn.innerText = "⚙️ Filter [OFF]";
+                btn.style.borderColor = "#0ff";
+                btn.style.color = "#0ff";
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById("search-input").value = "";
+            document.getElementById("filter-card-type").value = "";
+            document.getElementById("filter-race").value = "";
+            document.getElementById("filter-attribute").value = "";
+            document.getElementById("filter-level").value = "";
+            document.getElementById("filter-min-atk").value = "";
+            document.getElementById("filter-max-atk").value = "";
+            document.getElementById("filter-min-def").value = "";
+            document.getElementById("filter-max-def").value = "";
+            document.getElementById("filter-edison-only").checked = true;
+            searchCards();
+        }
+
+        async function searchCards() {
+            const q = (document.getElementById("search-input")?.value || "").trim();
+            const cardType = document.getElementById("filter-card-type")?.value || "";
+            const race = document.getElementById("filter-race")?.value || "";
+            const attribute = document.getElementById("filter-attribute")?.value || "";
+            const level = document.getElementById("filter-level")?.value || "";
+            const minAtk = document.getElementById("filter-min-atk")?.value || "";
+            const maxAtk = document.getElementById("filter-max-atk")?.value || "";
+            const minDef = document.getElementById("filter-min-def")?.value || "";
+            const maxDef = document.getElementById("filter-max-def")?.value || "";
+            const edisonOnly = document.getElementById("filter-edison-only")?.checked;
+
+            const params = new URLSearchParams();
+            if (q) params.append("q", q);
+            if (cardType) params.append("card_type", cardType);
+            if (race) params.append("race", race);
+            if (attribute) params.append("attribute", attribute);
+            if (level) params.append("level", level);
+            if (minAtk) params.append("min_atk", minAtk);
+            if (maxAtk) params.append("max_atk", maxAtk);
+            if (minDef) params.append("min_def", minDef);
+            if (maxDef) params.append("max_def", maxDef);
+            if (edisonOnly) params.append("edison_only", "true");
+            params.append("limit", "80");
+
+            const r = document.getElementById("search-results");
+            r.innerHTML = `<div style="color:#888; padding:10px;">Suche läuft...</div>`;
+
+            try {
+                const res = await fetch(`${apiBase}/search?${params.toString()}`);
+                const data = await res.json();
+                r.innerHTML = "";
+                const results = data.results || [];
+                const badge = document.getElementById("search-count-badge");
+                if (badge) badge.innerText = `${results.length} Treffer`;
+                if (results.length === 0) {
+                    r.innerHTML = `<div style="color:#e74c3c; padding:10px;">Keine Karten für die gewählten Filter gefunden.</div>`;
+                    return;
+                }
+                results.forEach(c => {
+                    r.appendChild(createCardEl(c, "search"));
+                });
+            } catch(err) {
+                console.error("Search error:", err);
+                r.innerHTML = `<div style="color:#e74c3c; padding:10px;">Fehler bei der Kartensuche.</div>`;
+            }
+        }
+
+        // FULL .YDK EXPORT (Client-side instant download)
+        function exportCurrentDeckYdk() {
+            if (mainDeck.length === 0 && extraDeck.length === 0 && sideDeck.length === 0) {
+                alert("Deck ist leer!");
+                return;
+            }
+            const name = (document.getElementById("deck-name").value.trim() || "MyDeck").replace(/[^a-zA-Z0-9_-]/g, "_");
+            const lines = [`#created by Aethelburg Deck Builder - ${name}`, "#main"];
+            mainDeck.forEach(c => lines.push(c.id));
+            lines.push("#extra");
+            extraDeck.forEach(c => lines.push(c.id));
+            lines.push("!side");
+            sideDeck.forEach(c => lines.push(c.id));
+            const content = lines.join("\n") + "\n";
+
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${name}.ydk`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // SIDE DECK ONLY .YDK EXPORT
+        function exportSideDeckOnly() {
+            if (sideDeck.length === 0) {
+                alert("Side Deck ist leer!");
+                return;
+            }
+            const name = (document.getElementById("deck-name").value.trim() || "MyDeck").replace(/[^a-zA-Z0-9_-]/g, "_");
+            const lines = [`#created by Aethelburg Deck Builder - ${name} [SIDE ONLY]`, "#main", "#extra", "!side"];
+            sideDeck.forEach(c => lines.push(c.id));
+            const content = lines.join("\n") + "\n";
+
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${name}_SideDeck.ydk`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // .YDK FILE IMPORT
+        function triggerYdkImport() {
+            const input = document.getElementById("ydk-file-input");
+            if (input) input.click();
+        }
+
+        async function handleYdkFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const text = await file.text();
+            const deckName = file.name.replace(/\.[^/.]+$/, "");
+
+            try {
+                const res = await fetch(`${apiBase}/deck/parse_ydk`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ ydk_text: text, name: deckName })
+                });
+                const data = await res.json();
+                if (data.main || data.extra || data.side) {
+                    mainDeck = data.main || [];
+                    extraDeck = data.extra || [];
+                    sideDeck = data.side || [];
+                    document.getElementById("deck-name").value = data.name || deckName;
+                    updateDecks();
+                    const legalStatus = data.is_edison_legal ? "Turnierlegal" : data.edison_status;
+                    alert(`Deck "${data.name}" erfolgreich importiert!\nMain: ${mainDeck.length} | Extra: ${extraDeck.length} | Side: ${sideDeck.length}\nStatus: ${legalStatus}`);
+                } else {
+                    alert("Konnte keine Kartendaten aus der .ydk-Datei parsen.");
+                }
+            } catch (err) {
+                console.error("YDK import error:", err);
+                alert("Fehler beim Verarbeiten der .ydk-Datei.");
+            } finally {
+                event.target.value = "";
+            }
+        }
+        
+        async function saveDeck() {
+            const name = document.getElementById("deck-name").value.trim();
+            if(!name) { alert("Bitte gib einen Deck-Namen ein!"); return; }
+            
+            const payload = {
+                name: name,
+                user_id: currentUserId,
+                user_name: currentUserName,
+                main: mainDeck.map(c => c.id),
+                extra: extraDeck.map(c => c.id),
+                side: sideDeck.map(c => c.id),
+                is_public: true
+            };
+            
+            const res = await fetch(`${apiBase}/save_deck`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if(data.status === "ok") {
+                const edisonNotice = data.is_edison_legal
+                    ? "\n\n[EDISON BANLIST]: Vollständig turnierlegal (April 2010)!"
+                    : `\n\n[EDISON BANLIST WARNUNG]: ${data.edison_validation?.status_text || 'Nicht turnierkonform'}`;
+                alert(`Deck "${name}" erfolgreich in SQLite Datenbank (Account: ${currentUserName}) gespeichert!${edisonNotice}`);
+                refreshDeckList(data.deck_id || name);
+            }
+        }
+
+        // AUTO-SORT MAIN DECK (Monsters by Level/ATK, Spells, Traps)
+        function sortMainDeck() {
+            if (mainDeck.length === 0) return;
+            mainDeck.sort((a, b) => {
+                const typeA = a.type || 0;
+                const typeB = b.type || 0;
+                const isMonsterA = (typeA & 1) !== 0 || ((a.level || 0) > 0);
+                const isMonsterB = (typeB & 1) !== 0 || ((b.level || 0) > 0);
+                const isSpellA = (typeA & 2) !== 0 || (typeof a.type === 'string' && a.type.toLowerCase().includes('spell'));
+                const isSpellB = (typeB & 2) !== 0 || (typeof b.type === 'string' && b.type.toLowerCase().includes('spell'));
+                const isTrapA = (typeA & 4) !== 0 || (typeof a.type === 'string' && a.type.toLowerCase().includes('trap'));
+                const isTrapB = (typeB & 4) !== 0 || (typeof b.type === 'string' && b.type.toLowerCase().includes('trap'));
+
+                const catA = isMonsterA ? 1 : (isSpellA ? 2 : (isTrapA ? 3 : 4));
+                const catB = isMonsterB ? 1 : (isSpellB ? 2 : (isTrapB ? 3 : 4));
+
+                if (catA !== catB) return catA - catB;
+
+                if (isMonsterA && isMonsterB) {
+                    if ((b.level || 0) !== (a.level || 0)) return (b.level || 0) - (a.level || 0);
+                    return (b.atk || 0) - (a.atk || 0);
+                }
+
+                return (a.name || "").localeCompare(b.name || "");
+            });
+            updateDecks();
+        }
+
+        // CLEAR DECK
+        function clearDeck() {
+            if (mainDeck.length === 0 && extraDeck.length === 0 && sideDeck.length === 0) return;
+            if (confirm("Möchtest du wirklich alle Karten aus dem aktuellen Deck entfernen?")) {
+                mainDeck = [];
+                extraDeck = [];
+                sideDeck = [];
+                updateDecks();
+            }
+        }
+
+        // TEST HAND GENERATOR (Draw 5 random cards from Main Deck)
+        function drawTestHand() {
+            if (mainDeck.length < 5) {
+                alert("Du benötigst mindestens 5 Karten im Main Deck, um eine 5-Karten Test-Hand zu ziehen!");
+                return;
+            }
+            const copy = [...mainDeck];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            const hand = copy.slice(0, 5);
+
+            const container = document.getElementById("test-hand-cards");
+            container.innerHTML = "";
+            hand.forEach(card => {
+                const wrap = document.createElement("div");
+                wrap.style.cssText = "width:95px; cursor:pointer; text-align:center; border:1px solid #0f0; border-radius:3px; padding:5px; background:#000; transition:transform 0.1s;";
+                wrap.onmouseover = () => {
+                    wrap.style.transform = "translateY(-4px)";
+                    renderPreview(card);
+                };
+                wrap.onmouseout = () => {
+                    wrap.style.transform = "translateY(0)";
+                };
+                const img = document.createElement("img");
+                img.src = `https://images.ygoprodeck.com/images/cards_small/${card.id}.jpg`;
+                img.style.cssText = "width:100%; border-radius:2px; display:block;";
+                img.onerror = () => { img.onerror = null; img.src = 'https://images.ygoprodeck.com/images/cards/back.jpg'; };
+                wrap.appendChild(img);
+                const title = document.createElement("div");
+                title.innerText = card.name;
+                title.style.cssText = "font-size:10px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:5px;";
+                wrap.appendChild(title);
+                container.appendChild(wrap);
+            });
+
+            const modal = document.getElementById("test-hand-modal");
+            modal.style.display = "flex";
+        }
+
+        function closeTestHand() {
+            document.getElementById("test-hand-modal").style.display = "none";
+        }
+    </script>
+
+    <!-- TEST HAND MODAL -->
+    <div id="test-hand-modal" onclick="if(event.target===this) closeTestHand()">
+        <div id="test-hand-box">
+            <h2 style="margin-top:0; color:#0f0; letter-spacing:1px;" data-i18n="test_hand_heading">🎲 Test-Hand (5 Karten)</h2>
+            <div style="color:#aaa; font-size:0.9em; margin-bottom:15px;" data-i18n="test_hand_sub">Simulierte Eröffnungshand aus deinem aktuellen Main Deck:</div>
+            <div id="test-hand-cards" style="display:flex; justify-content:center; gap:10px; margin:20px 0; flex-wrap:wrap;"></div>
+            <div style="display:flex; justify-content:center; gap:15px; margin-top:20px;">
+                <button class="btn" onclick="drawTestHand()" data-i18n="btn_redraw">🎲 Neu ziehen (Mulligan)</button>
+                <button class="btn" onclick="closeTestHand()" style="border-color:#e74c3c; color:#e74c3c;" data-i18n="btn_close">✕ Schließen</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
