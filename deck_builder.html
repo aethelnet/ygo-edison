@@ -167,18 +167,23 @@
     <div id="left">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-wrap:wrap; gap:10px;">
             <h1 style="margin:0;" data-i18n="page_title">Auratic Prime // Deck Builder</h1>
-            <div style="display:flex; align-items:center; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div id="format-toggle-container" style="display:inline-flex; align-items:center; background:#101018; border:2px solid #00e5ff; border-radius:4px; padding:2px; box-shadow:0 0 10px rgba(0,229,255,0.3);">
+                    <button type="button" id="btn-fmt-modern" onclick="setBuilderFormat('modern')" style="background:#00e5ff; color:#000; font-weight:bold; font-family:monospace; border:none; padding:5px 12px; border-radius:3px; cursor:pointer; font-size:11px; transition:all 0.2s; box-shadow:0 0 8px #00e5ff;">⚡ MODERN (MR5)</button>
+                    <button type="button" id="btn-fmt-edison" onclick="setBuilderFormat('edison')" style="background:transparent; color:#888; font-weight:bold; font-family:monospace; border:none; padding:5px 12px; border-radius:3px; cursor:pointer; font-size:11px; transition:all 0.2s;">📜 EDISON (2010)</button>
+                    <input type="hidden" id="builder-format-select" value="modern">
+                </div>
                 <button id="lang-toggle-btn" class="btn" onclick="toggleLanguage()" style="padding:4px 10px; font-size:12px; font-weight:bold; cursor:pointer;" title="Sprache wechseln / Switch Language">🌐 DE</button>
                 <div id="user-pilot-badge" style="background:#111; border:1px solid #0f0; padding:6px 12px; font-size:12px; color:#0f0;">
                     [<span data-i18n="pilot_tag">PILOT</span>]: <span id="pilot-name">Pilot</span> <span id="pilot-id" style="color:#888;">(usr_pilot)</span>
                 </div>
             </div>
         </div>
-        <div id="edison-status-box" style="margin-bottom: 15px; padding: 10px 14px; background: #080808; border: 1px solid #333; font-size: 13px;">
-            <span style="color:#aaa;" data-i18n="banlist_loading">[EDISON BANLIST] Lade Status...</span>
+        <div id="format-status-box" style="margin-bottom: 15px; padding: 10px 14px; background: #080808; border: 1px solid #333; font-size: 13px;">
+            <span style="color:#aaa;" id="status-box-text">[STATUS] Lade Deck-Regelwerk...</span>
         </div>
         <div style="display:flex; gap:10px; margin-bottom: 15px;">
-            <select id="deck-load" class="search-box" style="width:240px; margin:0;">
+            <select id="deck-load" class="search-box" style="width:240px; margin:0;" onchange="loadDeck()">
                 <option value="" data-i18n="load_deck_default">-- Load Deck --</option>
             </select>
             <button class="btn" onclick="loadDeck()" data-i18n="btn_load">📂 Load</button>
@@ -204,7 +209,7 @@
         <!-- SEARCH & FILTER TOOLBAR -->
         <div style="background:#0a0a0a; border:1px solid #222; padding:12px; margin-bottom:15px; box-sizing:border-box;">
             <div style="display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-                <input type="text" id="search-input" class="search-box" style="margin:0; flex:1; min-width:220px;" placeholder="Kartenname oder Effekttext suchen... (Enter)" data-i18n-placeholder="search_placeholder" onkeyup="if(event.key === 'Enter') searchCards()" />
+                <input type="text" id="search-input" class="search-box" style="margin:0; flex:1; min-width:220px;" placeholder="Kartenname, Passcode oder Effekttext... (Enter)" data-i18n-placeholder="search_placeholder" onkeyup="if(event.key === 'Enter') searchCards()" oninput="debouncedSearch()" />
                 <button class="btn" onclick="searchCards()" data-i18n="btn_search">🔍 Suchen</button>
                 <button class="btn" onclick="toggleFilterPanel()" id="btn-toggle-filters" style="border-color:#0ff; color:#0ff;">⚙️ Filter [OFF]</button>
                 <button class="btn" onclick="resetFilters()" style="border-color:#666; color:#aaa;" data-i18n="btn_reset">✕ Reset</button>
@@ -221,6 +226,9 @@
                         <option value="fusion">Fusionsmonster</option>
                         <option value="ritual">Ritualmonster</option>
                         <option value="synchro">Synchromonster</option>
+                        <option value="xyz">Xyz-Monster</option>
+                        <option value="link">Link-Monster</option>
+                        <option value="pendulum">Pendelmonster</option>
                         <option value="tuner">Empfänger (Tuner)</option>
                         <option value="spell">Zauber (Spell)</option>
                         <option value="trap">Falle (Trap)</option>
@@ -299,7 +307,7 @@
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; padding-top:16px;">
-                    <input type="checkbox" id="filter-edison-only" checked onchange="searchCards()" style="accent-color:#0f0; cursor:pointer;" />
+                    <input type="checkbox" id="filter-edison-only" onchange="searchCards()" style="accent-color:#0f0; cursor:pointer;" />
                     <label for="filter-edison-only" style="font-size:12px; color:#0f0; cursor:pointer; user-select:none;">Nur Edison (kein Xyz/Link)</label>
                 </div>
             </div>
@@ -478,7 +486,18 @@
             } else if (isSpell) {
                 document.getElementById('preview-stats').innerHTML = '<span style="color:#2ecc71; font-weight:bold; font-size:1.1em;">🟩 [ZAUBER / SPELL CARD]</span>';
             } else if (isMonster) {
-                document.getElementById('preview-stats').innerHTML = `<span style="color:#f1c40f; font-weight:bold;">⚔️ ATK: ${c.atk !== undefined ? c.atk : 0} | 🛡️ DEF: ${c.def !== undefined ? c.def : 0} | ⭐ LVL: ${c.level || '?'}</span>`;
+                const t = Number(c.type) || 0;
+                const isLink = (t & 0x4000000) !== 0;
+                const isXyz = (t & 0x800000) !== 0;
+                let statText = "";
+                if (isLink) {
+                    statText = `<span style="color:#00e5ff; font-weight:bold;">⚔️ ATK: ${c.atk !== undefined ? c.atk : 0} | 🔗 LINK-${c.level || '?'}</span>`;
+                } else if (isXyz) {
+                    statText = `<span style="color:#f1c40f; font-weight:bold;">⚔️ ATK: ${c.atk !== undefined ? c.atk : 0} | 🛡️ DEF: ${c.def !== undefined ? c.def : 0} | ⬛ RANG: ${c.level || '?'}</span>`;
+                } else {
+                    statText = `<span style="color:#f1c40f; font-weight:bold;">⚔️ ATK: ${c.atk !== undefined ? c.atk : 0} | 🛡️ DEF: ${c.def !== undefined ? c.def : 0} | ⭐ LVL: ${c.level || '?'}</span>`;
+                }
+                document.getElementById('preview-stats').innerHTML = statText;
             } else {
                 document.getElementById('preview-stats').innerText = "Card #" + c.id;
             }
@@ -574,6 +593,35 @@
                     }
                 };
             } else {
+                // Add badge button (top-right)
+                const addBtn = document.createElement("div");
+                addBtn.className = "card-badge-btn";
+                addBtn.style.cssText = "top:2px; right:2px; color:#0f0; border-color:#0f0; font-size:13px;";
+                addBtn.title = "Klicken: Zum Main/Extra Deck hinzufügen";
+                addBtn.innerText = "+";
+                addBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    addCardToDeck(c);
+                };
+                w.appendChild(addBtn);
+
+                // Add to side button (top-left)
+                const sideBtn = document.createElement("div");
+                sideBtn.className = "card-badge-btn";
+                sideBtn.style.cssText = "top:2px; left:2px; color:#00ffff; border-color:#00ffff; font-size:10px;";
+                sideBtn.title = "Klicken: Zum Side Deck hinzufügen";
+                sideBtn.innerText = "+S";
+                sideBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (sideDeck.length < 15) {
+                        sideDeck.push(c);
+                        updateDecks();
+                    } else {
+                        alert("Side Deck ist voll (max. 15)!");
+                    }
+                };
+                w.appendChild(sideBtn);
+
                 // Left click -> Add to Main or Extra
                 w.onclick = () => {
                     addCardToDeck(c);
@@ -856,11 +904,58 @@
         // Initialize language
         setLanguage(localStorage.getItem("ygo_lang") || "de");
 
+        let currentBuilderFormat = localStorage.getItem("ygo_format") || "modern";
+
+        function setBuilderFormat(fmt, skipSearch = false) {
+            currentBuilderFormat = fmt;
+            localStorage.setItem("ygo_format", fmt);
+            const hiddenFmt = document.getElementById("builder-format-select");
+            if (hiddenFmt) hiddenFmt.value = fmt;
+
+            const btnMod = document.getElementById("btn-fmt-modern");
+            const btnEd = document.getElementById("btn-fmt-edison");
+            const chkEdison = document.getElementById("filter-edison-only");
+
+            if (fmt === "modern") {
+                if (btnMod) {
+                    btnMod.style.background = "#00e5ff";
+                    btnMod.style.color = "#000";
+                    btnMod.style.boxShadow = "0 0 10px #00e5ff";
+                }
+                if (btnEd) {
+                    btnEd.style.background = "transparent";
+                    btnEd.style.color = "#888";
+                    btnEd.style.boxShadow = "none";
+                }
+                if (chkEdison) chkEdison.checked = false;
+            } else {
+                if (btnMod) {
+                    btnMod.style.background = "transparent";
+                    btnMod.style.color = "#888";
+                    btnMod.style.boxShadow = "none";
+                }
+                if (btnEd) {
+                    btnEd.style.background = "#f39c12";
+                    btnEd.style.color = "#000";
+                    btnEd.style.boxShadow = "0 0 10px #f39c12";
+                }
+                if (chkEdison) chkEdison.checked = true;
+            }
+
+            updateLegality();
+            if (!skipSearch) {
+                const sInput = document.getElementById("search-input");
+                if (sInput && sInput.value.trim()) {
+                    searchCards();
+                }
+            }
+        }
+
         let valDebounce = null;
-        function updateEdisonLegality() {
+        function updateLegality() {
             clearTimeout(valDebounce);
             valDebounce = setTimeout(async () => {
-                const statusBox = document.getElementById("edison-status-box");
+                const statusBox = document.getElementById("format-status-box");
                 if (!statusBox) return;
                 try {
                     const res = await fetch(`${apiBase}/validate_deck`, {
@@ -869,18 +964,23 @@
                         body: JSON.stringify({
                             main: mainDeck.map(c => c.id),
                             extra: extraDeck.map(c => c.id),
-                            side: sideDeck.map(c => c.id)
+                            side: sideDeck.map(c => c.id),
+                            format: currentBuilderFormat
                         })
                     });
                     const val = await res.json();
+                    const isModern = currentBuilderFormat === "modern";
                     if (val.is_legal) {
-                        statusBox.innerHTML = `<span style="color:#0f0; font-weight:bold;">[EDISON LEGAL]</span> <span style="color:#aaa;">Main: ${val.main_count}/40-60 | Extra: ${val.extra_count}/15 | Side: ${val.side_count}/15 (March/April 2010 konform)</span>`;
+                        const tag = isModern ? "[MODERN LEGAL]" : "[EDISON LEGAL]";
+                        const sub = isModern ? "(Master Rule 5 konform)" : "(March/April 2010 konform)";
+                        statusBox.innerHTML = `<span style="color:#0f0; font-weight:bold;">${tag}</span> <span style="color:#aaa;">Main: ${val.main_count}/40-60 | Extra: ${val.extra_count}/15 | Side: ${val.side_count}/15 ${sub}</span>`;
                         statusBox.style.borderColor = "#0f0";
                         statusBox.style.background = "#001a00";
                     } else {
+                        const tag = isModern ? "[MODERN ILLEGAL]" : "[EDISON ILLEGAL]";
                         const topViolations = (val.violations || []).slice(0, 3).map(v => v.message).join(" | ");
                         const more = (val.violations || []).length > 3 ? ` (+${val.violations.length - 3} weitere)` : "";
-                        statusBox.innerHTML = `<span style="color:#e74c3c; font-weight:bold;">[EDISON ILLEGAL]</span> <span style="color:#ff8888; font-size:11px;">${topViolations}${more}</span>`;
+                        statusBox.innerHTML = `<span style="color:#e74c3c; font-weight:bold;">${tag}</span> <span style="color:#ff8888; font-size:11px;">${topViolations}${more}</span>`;
                         statusBox.style.borderColor = "#e74c3c";
                         statusBox.style.background = "#1a0000";
                     }
@@ -912,7 +1012,7 @@
                 s.appendChild(createCardEl(c, "side", idx));
             });
 
-            updateEdisonLegality();
+            updateLegality();
         };
 
         const apiBase = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || !window.location.hostname)
@@ -933,8 +1033,8 @@
                     data.my_decks.forEach(d => {
                         const opt = document.createElement("option");
                         opt.value = d.deck_id || d.deck_name;
-                        const edisonTag = d.is_edison_legal ? " [EDISON]" : "";
-                        opt.innerText = `${d.deck_name}${edisonTag}`;
+                        const fmtTag = d.format_tag || (d.format ? (d.format.toLowerCase() === "edison" ? " [EDISON]" : " [MODERN]") : (d.is_edison_legal ? " [EDISON]" : " [MODERN]"));
+                        opt.innerText = `${d.deck_name}${fmtTag}`;
                         if (selectedIdentifier && (d.deck_name === selectedIdentifier || d.deck_id === selectedIdentifier)) opt.selected = true;
                         myGroup.appendChild(opt);
                     });
@@ -947,9 +1047,9 @@
                     data.community_decks.forEach(d => {
                         const opt = document.createElement("option");
                         opt.value = d.deck_id || d.deck_name;
-                        const edisonTag = d.is_edison_legal ? " [EDISON]" : "";
+                        const fmtTag = d.format_tag || (d.format ? (d.format.toLowerCase() === "edison" ? " [EDISON]" : " [MODERN]") : (d.is_edison_legal ? " [EDISON]" : " [MODERN]"));
                         const author = d.user_name ? ` (${d.user_name})` : "";
-                        opt.innerText = `${d.deck_name}${author}${edisonTag}`;
+                        opt.innerText = `${d.deck_name}${author}${fmtTag}`;
                         if (selectedIdentifier && (d.deck_name === selectedIdentifier || d.deck_id === selectedIdentifier)) opt.selected = true;
                         commGroup.appendChild(opt);
                     });
@@ -970,6 +1070,19 @@
             extraDeck = data.extra || [];
             sideDeck = data.side || [];
             document.getElementById("deck-name").value = data.name || identifier;
+
+            // Auto-detect format from loaded deck cards & format field
+            const hasModern = [...mainDeck, ...extraDeck, ...sideDeck].some(c => {
+                const t = Number(c.type) || 0;
+                return (t & (0x800000 | 0x1000000 | 0x4000000)) !== 0; // Xyz, Pendulum, Link
+            });
+            const deckFmt = (data.format || "").toLowerCase();
+            if (hasModern || deckFmt === "modern" || data.is_edison_legal === false) {
+                setBuilderFormat("modern", true);
+            } else {
+                setBuilderFormat("edison", true);
+            }
+
             updateDecks();
         }
 
@@ -1000,8 +1113,17 @@
             document.getElementById("filter-max-atk").value = "";
             document.getElementById("filter-min-def").value = "";
             document.getElementById("filter-max-def").value = "";
-            document.getElementById("filter-edison-only").checked = true;
+            const chk = document.getElementById("filter-edison-only");
+            if (chk) chk.checked = (currentBuilderFormat === "edison");
             searchCards();
+        }
+
+        let searchDebounce = null;
+        function debouncedSearch() {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                searchCards();
+            }, 250);
         }
 
         async function searchCards() {
@@ -1014,7 +1136,7 @@
             const maxAtk = document.getElementById("filter-max-atk")?.value || "";
             const minDef = document.getElementById("filter-min-def")?.value || "";
             const maxDef = document.getElementById("filter-max-def")?.value || "";
-            const edisonOnly = document.getElementById("filter-edison-only")?.checked;
+            const edisonOnly = (currentBuilderFormat === "edison") && (document.getElementById("filter-edison-only")?.checked ?? false);
 
             const params = new URLSearchParams();
             if (q) params.append("q", q);
@@ -1149,6 +1271,7 @@
                 main: mainDeck.map(c => c.id),
                 extra: extraDeck.map(c => c.id),
                 side: sideDeck.map(c => c.id),
+                format: currentBuilderFormat,
                 is_public: true
             };
             
@@ -1159,10 +1282,15 @@
             });
             const data = await res.json();
             if(data.status === "ok") {
-                const edisonNotice = data.is_edison_legal
-                    ? "\n\n[EDISON BANLIST]: Vollständig turnierlegal (April 2010)!"
-                    : `\n\n[EDISON BANLIST WARNUNG]: ${data.edison_validation?.status_text || 'Nicht turnierkonform'}`;
-                alert(`Deck "${name}" erfolgreich in SQLite Datenbank (Account: ${currentUserName}) gespeichert!${edisonNotice}`);
+                let statusNotice = "";
+                if (currentBuilderFormat === "modern") {
+                    statusNotice = "\n\n[REGELWERK]: Gespeichert als Modern (MR5)!";
+                } else {
+                    statusNotice = data.is_edison_legal
+                        ? "\n\n[EDISON BANLIST]: Vollständig turnierlegal (April 2010)!"
+                        : `\n\n[EDISON BANLIST WARNUNG]: ${data.edison_validation?.status_text || 'Nicht turnierkonform'}`;
+                }
+                alert(`Deck "${name}" erfolgreich in SQLite Datenbank (Account: ${currentUserName}) gespeichert!${statusNotice}`);
                 refreshDeckList(data.deck_id || name);
             }
         }
@@ -1250,6 +1378,9 @@
         function closeTestHand() {
             document.getElementById("test-hand-modal").style.display = "none";
         }
+
+        // Initialize builder format
+        setBuilderFormat(currentBuilderFormat, true);
     </script>
 
     <!-- TEST HAND MODAL -->

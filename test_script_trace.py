@@ -1,8 +1,8 @@
 import os
 
 script_dirs = [
-    os.getenv("YGO_SCRIPT_DIR", ""),
     os.path.abspath(os.path.join(os.path.dirname(__file__), "script")),
+    "/home/ubuntu/ygo_service/apps/script",
 ]
 
 for card_id in [48686504, 15341821, 20932152]:

@@ -35,7 +35,7 @@ from ai_sidedeck_engine import AISideDeckEngine
 from tournament_engine import tournament_engine
 from replay_engine import replay_engine, to_ydk
 import tournament_sync
-from ygo_scenarios import SCENARIOS, get_scenario_metadata_list, setup_scenario_board, board_to_scenario
+from ygo_scenarios import SCENARIOS, get_scenario_metadata_list, setup_scenario_board, board_to_scenario, delete_scenario
 
 discrepancy_logger = EngineDiscrepancyLogger()
 deck_db = DeckDatabase()
@@ -131,10 +131,12 @@ def card_reader_cb(code, pdata):
     return 1 if info else 0
 
 script_dirs = [
-    os.getenv("YGO_SCRIPT_DIR", ""),
     os.path.abspath(os.path.join(os.path.dirname(__file__), "script")),
     os.path.abspath(os.path.join(os.path.dirname(__file__), "../script")),
-    os.path.abspath("./script")
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../backend_clean/script")),
+    os.path.abspath("./script"),
+    "/home/ubuntu/ygo_service/apps/script",
+    "/home/ubuntu/ygo_service/script"
 ]
 _buffers = []
 
@@ -157,8 +159,19 @@ def script_reader_cb(name_bytes, plen):
     plen[0] = 0
     return 0
 
+@ctypes.CFUNCTYPE(ctypes.c_uint32, ctypes.c_void_p, ctypes.c_uint32)
+def message_handler_cb(pduel, msg_type):
+    try:
+        err_msg = ctypes.string_at(pduel).decode('utf-8', errors='ignore')
+        if err_msg.strip():
+            print(f"[OCGCORE LOG type={msg_type}]: {err_msg.strip()}")
+    except Exception as e:
+        print(f"[OCGCORE LOG ERROR]: {e}")
+    return 0
+
 ocgcore.set_card_reader(card_reader_cb)
 ocgcore.set_script_reader(script_reader_cb)
+ocgcore.set_message_handler(message_handler_cb)
 ocgcore.create_duel.restype = ctypes.c_void_p
 ocgcore.create_duel.argtypes = [ctypes.c_uint32]
 ocgcore.set_player_info.argtypes = [ctypes.c_void_p, ctypes.c_int32, ctypes.c_int32, ctypes.c_int32, ctypes.c_int32]
@@ -252,6 +265,7 @@ class DuelRoom:
     def __init__(self, room_id: str, is_pvp: bool = False):
         self.room_id = room_id
         self.is_pvp = is_pvp
+        self.format = None
         self.players = {0: None, 1: None}
         self.player_names = {0: "Spieler 1", 1: "Spieler 2"}
         self.player_ids = {0: None, 1: None}
@@ -280,6 +294,10 @@ class DuelRoom:
         self.first_turn_player = 0
         self.first_turn_chosen = False
         self.loser_of_last_game = None
+        self.ai_deck = None
+        self.match_mode = "bo3"
+        self.start_lp = 8000
+        self.turn_choice = "random"
         self.ocg_to_room = {0: 0, 1: 1}
         self.room_to_ocg = {0: 0, 1: 1}
         self.sided_main = {0: [], 1: []}
@@ -1073,8 +1091,13 @@ def search_cards(
     params = []
 
     if q and q.strip():
-        where_clauses.append("(t.name LIKE ? OR t.desc LIKE ?)")
-        params.extend([f"%{q.strip()}%", f"%{q.strip()}%"])
+        q_str = q.strip()
+        if q_str.isdigit():
+            where_clauses.append("(d.id = ? OR CAST(d.id AS TEXT) LIKE ? OR t.name LIKE ? OR t.desc LIKE ?)")
+            params.extend([int(q_str), f"{q_str}%", f"%{q_str}%", f"%{q_str}%"])
+        else:
+            where_clauses.append("(t.name LIKE ? OR t.desc LIKE ?)")
+            params.extend([f"%{q_str}%", f"%{q_str}%"])
 
     if card_type:
         try:
@@ -1101,6 +1124,10 @@ def search_cards(
                 where_clauses.append("(d.type & 0x2000) != 0")
             elif ctype_lower == "xyz":
                 where_clauses.append("(d.type & 0x800000) != 0")
+            elif ctype_lower == "link":
+                where_clauses.append("(d.type & 0x4000000) != 0")
+            elif ctype_lower == "pendulum":
+                where_clauses.append("(d.type & 0x1000000) != 0")
             elif ctype_lower == "tuner":
                 where_clauses.append("(d.type & 0x1000) != 0")
 
@@ -1498,6 +1525,7 @@ class DeckData(BaseModel):
     user_name: Optional[str] = None
     is_public: Optional[bool] = True
     deck_id: Optional[str] = None
+    format: Optional[str] = None
 
 class YdkUploadPayload(BaseModel):
     ydk_text: str
@@ -1541,6 +1569,11 @@ def api_snapshot_duel(payload: ScenarioSnapshotPayload):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/scenarios/{scenario_id}")
+def api_delete_scenario(scenario_id: str):
+    success = delete_scenario(scenario_id)
+    return {"status": "OK" if success else "NOT_FOUND", "deleted": success}
 
 @app.get("/api/decks")
 def list_decks(user_id: Optional[str] = None):
@@ -1729,7 +1762,8 @@ def save_deck(data: DeckData):
         extra=data.extra,
         side=data.side,
         is_public=data.is_public if data.is_public is not None else True,
-        deck_id=data.deck_id
+        deck_id=data.deck_id,
+        format=data.format
     )
     res["filename"] = f"{safe_name}.ydk"
     res["ingested"] = sync_res
@@ -1740,11 +1774,83 @@ def delete_deck(deck_id: str, user_id: Optional[str] = None):
     deleted = deck_db.delete_deck(deck_id, user_id)
     return {"status": "ok" if deleted else "not_found", "deleted": deleted}
 
+def check_modern_legality(main_ids: list, extra_ids: list = None, side_ids: list = None) -> dict:
+    extra_ids = extra_ids or []
+    side_ids = side_ids or []
+    violations = []
+    
+    main_len = len(main_ids)
+    extra_len = len(extra_ids)
+    side_len = len(side_ids)
+    
+    if main_len < 40:
+        violations.append({
+            "type": "DECK_SIZE_TOO_SMALL",
+            "message": f"Main Deck enthält nur {main_len} Karten (mindestens 40 erforderlich)."
+        })
+    elif main_len > 60:
+        violations.append({
+            "type": "DECK_SIZE_TOO_LARGE",
+            "message": f"Main Deck enthält {main_len} Karten (maximal 60 erlaubt)."
+        })
+        
+    if extra_len > 15:
+        violations.append({
+            "type": "EXTRA_DECK_TOO_LARGE",
+            "message": f"Extra Deck enthält {extra_len} Karten (maximal 15 erlaubt)."
+        })
+        
+    if side_len > 15:
+        violations.append({
+            "type": "SIDE_DECK_TOO_LARGE",
+            "message": f"Side Deck enthält {side_len} Karten (maximal 15 erlaubt)."
+        })
+        
+    counts = {}
+    for cid in main_ids + extra_ids + side_ids:
+        if cid > 0:
+            counts[cid] = counts.get(cid, 0) + 1
+            
+    for cid, cnt in counts.items():
+        if cnt > 3:
+            meta = db.card_metadata.get(cid)
+            cname = meta["name"] if meta else f"Karte #{cid}"
+            violations.append({
+                "type": "MAX_COPIES_EXCEEDED",
+                "card_id": cid,
+                "card_name": cname,
+                "count": cnt,
+                "max_allowed": 3,
+                "message": f"[MAX 3] '{cname}' darf maximal 3-mal gespielt werden ({cnt} im Deck)."
+            })
+            
+    is_legal = len(violations) == 0
+    return {
+        "is_legal": is_legal,
+        "format": "modern",
+        "violations": violations,
+        "status_text": "MODERN LEGAL" if is_legal else f"ILLEGAL ({len(violations)} Regelverstösse)",
+        "main_count": main_len,
+        "extra_count": extra_len,
+        "side_count": side_len
+    }
+
 @app.post("/api/validate_deck")
 def validate_deck_endpoint(payload: dict):
     main = payload.get("main", [])
     extra = payload.get("extra", [])
     side = payload.get("side", [])
+    fmt = (payload.get("format") or "").strip().lower()
+    
+    if not fmt:
+        has_modern = any(
+            bool(db.card_metadata.get(cid, {}).get("type", 0) & (0x800000 | 0x1000000 | 0x4000000))
+            for cid in main + extra + side
+        )
+        fmt = "modern" if has_modern else "edison"
+        
+    if fmt == "modern":
+        return check_modern_legality(main, extra, side)
     return check_edison_legality(main, extra, side)
 
 @app.get("/api/rooms")
@@ -2981,12 +3087,32 @@ def run_duel_session(room: DuelRoom):
         side_p1 = []
     else:
         main_p0, extra_p0, side_p0 = load_deck_cards(room.decks.get(0), room.player_ids.get(0), deck_engine, total_cards, locked_snapshot=snap_p0)
+        p0_val = check_edison_legality(main_p0, extra_p0, side_p0)
+
+        # Detect whether Player 0 deck contains modern cards (Xyz, Pendulum, Link, or modern cards)
+        has_modern = any(
+            bool(db.card_metadata.get(cid, {}).get("type", 0) & (0x800000 | 0x1000000 | 0x4000000))
+            for cid in main_p0 + extra_p0 + side_p0
+        )
+        if has_modern or not p0_val["is_legal"]:
+            room.format = "modern"
+        elif not getattr(room, "format", None):
+            room.format = "edison" if p0_val["is_legal"] else "modern"
+
+        print(f"ROOM [{room.room_id}]: Format locked to '{room.format.upper()}' (has_modern_cards={has_modern}, p0_edison_legal={p0_val['is_legal']})")
+
         if room.is_pvp:
             main_p1, extra_p1, side_p1 = load_deck_cards(room.decks.get(1), room.player_ids.get(1), deck_engine, total_cards, locked_snapshot=snap_p1)
         else:
-            # Solo mode vs PROPHIT-AI: Assign a verified canonical Edison tournament archetype
-            ai_deck_candidates = ["Edison_Quickdraw_Dandy", "Edison_Blackwing", "Edison_Machina_Gadget", "Edison_Diva_HERO"]
-            ai_chosen = ai_deck_candidates[abs(hash(room.room_id)) % len(ai_deck_candidates)]
+            # Solo mode vs PROPHIT-AI
+            if getattr(room, "ai_deck", None) and room.ai_deck not in ["", "random", "zufall"]:
+                ai_chosen = room.ai_deck
+            elif getattr(room, "format", "edison").lower() == "modern":
+                ai_deck_candidates = ["Kashtira_Control", "osint_tier1_snake_eye", "Tearlaments_Full_Power", "Pure_PUNK"]
+                ai_chosen = ai_deck_candidates[abs(hash(room.room_id)) % len(ai_deck_candidates)]
+            else:
+                ai_deck_candidates = ["Edison_Quickdraw_Dandy", "Edison_Blackwing", "Edison_Machina_Gadget", "Edison_Diva_HERO"]
+                ai_chosen = ai_deck_candidates[abs(hash(room.room_id)) % len(ai_deck_candidates)]
             p1_deck_name = ai_chosen
             room.decks[1] = ai_chosen
             main_p1, extra_p1, side_p1 = load_deck_cards(ai_chosen, "sys_ai", deck_engine, total_cards)
@@ -3021,8 +3147,11 @@ def run_duel_session(room: DuelRoom):
     parser = YGOByteParser()
     msg_buf = ctypes.create_string_buffer(65536)
 
+    match_max_wins = 1 if getattr(room, "match_mode", "bo3") == "bo1" else 2
+    max_games = 1 if match_max_wins == 1 else 3
+
     try:
-        while room.is_active and not room.match_finished and max(room.match_wins.values()) < 2 and room.current_game <= 3:
+        while room.is_active and not room.match_finished and max(room.match_wins.values()) < match_max_wins and room.current_game <= max_games:
             room.duel_ended = False
             room.retry_count = 0
             room.last_mtype = None
@@ -3047,8 +3176,9 @@ def run_duel_session(room: DuelRoom):
                 room.room_to_ocg = {0: 0, 1: 1}
                 room.first_turn_player = 0
             else:
-                ocgcore.set_player_info(pduel, 0, 8000, 5, 1)
-                ocgcore.set_player_info(pduel, 1, 8000, 5, 1)
+                start_lp = getattr(room, "start_lp", 8000) or 8000
+                ocgcore.set_player_info(pduel, 0, start_lp, 5, 1)
+                ocgcore.set_player_info(pduel, 1, start_lp, 5, 1)
 
                 cur_main_p0 = list(room.sided_main[0])
                 cur_extra_p0 = list(room.sided_extra[0])
@@ -3057,6 +3187,16 @@ def run_duel_session(room: DuelRoom):
 
                 random.shuffle(cur_main_p0)
                 random.shuffle(cur_main_p1)
+
+                # Determine who goes first in Game 1
+                if room.current_game == 1:
+                    tc = getattr(room, "turn_choice", "random")
+                    if tc == "first":
+                        room.first_turn_player = 0
+                    elif tc == "second":
+                        room.first_turn_player = 1
+                    else:
+                        room.first_turn_player = random.randint(0, 1)
 
                 # Determine who goes first in ocgcore
                 if room.first_turn_player == 0:
@@ -3080,8 +3220,14 @@ def run_duel_session(room: DuelRoom):
                 for i, cid in enumerate(extra_ocg1):
                     ocgcore.new_card(pduel, int(cid), 1, 1, 64, i, 8)
                 
-            # 0x08 = DUEL_OBSOLETE_RULING (Restores authentic April 2010 Edison Ignition Priority)
-            ocgcore.start_duel(pduel, 0x08)
+            # Determine format rule options:
+            # Modern (MR5): (5 << 16) -> enables Extra Monster Zones, Link/Xyz mechanics, modern trigger timings
+            # Edison (MR1): 0x08 -> DUEL_OBSOLETE_RULING (April 2010 Ignition Priority)
+            duel_options = 0x08
+            if getattr(room, "format", "edison").lower() == "modern":
+                duel_options = (5 << 16)
+            ocgcore.start_duel(pduel, duel_options)
+            print(f"ROOM [{room.room_id}]: ocgcore.start_duel initialized with duel_options = {duel_options:#x} (Rule: {'MR5' if duel_options == (5 << 16) else 'Edison 2010'})")
             if room.scenario_data:
                 room.send_to(0, {
                     "type": "SCENARIO_INFO",
@@ -3098,7 +3244,8 @@ def run_duel_session(room: DuelRoom):
                 "score": {0: p0_w, 1: p1_w},
                 "score_str": f"{p0_w} : {p1_w}",
                 "first_player": (0 if room.first_turn_player == 0 else 1),
-                "message": f"Game {room.current_game} gestartet! (Spielstand: {p0_w}:{p1_w})"
+                "format": getattr(room, "format", "edison"),
+                "message": f"Game {room.current_game} gestartet! ({getattr(room, 'format', 'edison').upper()}-Format, Spielstand: {p0_w}:{p1_w})"
             })
             if room.is_pvp:
                 room.send_to(1, {
@@ -3293,8 +3440,9 @@ def run_duel_session(room: DuelRoom):
                             continue
                         
                         if parsed and isinstance(parsed, dict):
+                            active_cards = set(room.sided_main.get(0, []) + room.sided_extra.get(0, []) + room.sided_main.get(1, []) + room.sided_extra.get(1, []))
                             if 'desc' in parsed and parsed['desc']:
-                                parsed['desc_text'] = db.get_description(parsed['desc'])
+                                parsed['desc_text'] = db.get_description(parsed['desc'], card_id=parsed.get('card_id'), active_cards=active_cards)
                             for k, v in parsed.items():
                                 if isinstance(v, list):
                                     for item in v:
@@ -3315,13 +3463,21 @@ def run_duel_session(room: DuelRoom):
                                                 if not item.get('name'):
                                                     item['name'] = f"Card {item['card_id']}"
                                         if 'desc' in item and item['desc']:
-                                            desc_str = db.get_description(item['desc'])
+                                            desc_str = db.get_description(item['desc'], card_id=item.get('card_id'), active_cards=active_cards)
                                             if desc_str:
                                                 item['desc_text'] = desc_str
                                                 if item.get('type') == 'OPTION' or not item.get('name'):
                                                     item['name'] = desc_str
                                                 elif item.get('type') in ['ACTIVATE', 'ACTIVATE_CHAIN']:
                                                     item['name'] = f"{item.get('name', 'Effekt')}: {desc_str}"
+                                        
+                                        # Explicit Foxy Tune disambiguation fallback if no desc decoded
+                                        if item.get('card_id') == 55920742 and item.get('type') in ['ACTIVATE', 'ACTIVATE_CHAIN'] and not item.get('desc_text'):
+                                            if item.get('desc') in [0, 0x86600000, 2254438400, 894731872]:
+                                                item['desc_text'] = "[HAND-SPECIAL] 1 P.U.N.K. tributieren -> Foxy Tune beschwören"
+                                            else:
+                                                item['desc_text'] = "[DECK-SPECIAL] Handkarte abwerfen -> P.U.N.K. aus Deck holen"
+                                            item['name'] = f"Noh-P.U.N.K. Foxy Tune: {item['desc_text']}"
                             
                             if mtype in [10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26, 140, 141, 142, 143]:
                                 room_player = room.ocg_to_room.get(player, player)
@@ -3427,7 +3583,7 @@ def run_duel_session(room: DuelRoom):
             # --- END INNER GAME LOOP ---
 
             # Check if match continues: Sidedecking phase wait
-            if not room.match_finished and max(room.match_wins.values()) < 2 and room.current_game < 3 and room.is_active:
+            if not room.match_finished and max(room.match_wins.values()) < match_max_wins and room.current_game < max_games and room.is_active:
                 print(f"ROOM [{room.room_id}]: Game {room.current_game} completed. Waiting for Sidedecking (timeout {int(room.sidedeck_timeout_duration)}s)...")
                 if not (room.side_decks_ready[0] and room.side_decks_ready[1] and room.first_turn_chosen):
                     waited = room.sidedeck_event.wait(timeout=room.sidedeck_timeout_duration)
@@ -3886,13 +4042,23 @@ async def websocket_endpoint(
     reconnect_token: Optional[str] = None,
     spectator: Optional[str] = None,
     referee_pin: Optional[str] = None,
-    scenario: Optional[str] = None
+    scenario: Optional[str] = None,
+    format: Optional[str] = None,
+    ai_deck: Optional[str] = None,
+    match_mode: Optional[str] = None,
+    lp: Optional[int] = None,
+    turn_choice: Optional[str] = None
 ):
     await websocket.accept()
     loop = asyncio.get_event_loop()
     clean_user_name = (user_name or "Stefan").strip() or "Stefan"
     clean_user_id = (user_id or f"usr_{uuid.uuid4().hex[:8]}").strip()
     clean_token = reconnect_token.strip() if reconnect_token else None
+    clean_format = format.strip().lower() if format and format.strip() else None
+    clean_ai_deck = ai_deck.strip() if ai_deck and ai_deck.strip() else None
+    clean_match_mode = match_mode.strip().lower() if match_mode and match_mode.strip().lower() in ["bo1", "bo3"] else "bo3"
+    clean_lp = int(lp) if lp and int(lp) in [2000, 4000, 8000, 16000] else 8000
+    clean_turn_choice = turn_choice.strip().lower() if turn_choice and turn_choice.strip().lower() in ["first", "second", "random"] else "random"
 
     # Check if referee pin provided at connection
     is_referee_conn = False
@@ -3963,6 +4129,11 @@ async def websocket_endpoint(
     if scenario or not room or room.strip() in ["", "solo", "ai"]:
         solo_room_id = f"scen_{uuid.uuid4().hex[:8]}" if scenario else f"solo_{uuid.uuid4().hex[:8]}"
         solo_room = room_mgr.get_or_create(solo_room_id, is_pvp=False)
+        solo_room.format = clean_format
+        if clean_ai_deck: solo_room.ai_deck = clean_ai_deck
+        solo_room.match_mode = clean_match_mode
+        solo_room.start_lp = clean_lp
+        solo_room.turn_choice = clean_turn_choice
         solo_room.players[0] = websocket
         solo_room.player_names[0] = clean_user_name
         
@@ -4019,6 +4190,12 @@ async def websocket_endpoint(
     # ----------------------------------------------------
     clean_room_id = room.strip()
     pvp_room = room_mgr.get_or_create(clean_room_id, is_pvp=True)
+    if clean_format and not getattr(pvp_room, "format", None):
+        pvp_room.format = clean_format
+    if clean_match_mode and not getattr(pvp_room, "match_mode", None):
+        pvp_room.match_mode = clean_match_mode
+    if clean_lp and not getattr(pvp_room, "start_lp", None):
+        pvp_room.start_lp = clean_lp
     
     is_spec_request = (spectator == "1" or str(spectator).lower() in ["true", "yes", "spec"])
     assigned_role = None

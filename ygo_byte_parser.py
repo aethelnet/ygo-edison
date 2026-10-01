@@ -28,6 +28,13 @@ class YGOByteParser:
             return val
         return 0
 
+    def read_uint32(self):
+        if self.offset + 4 <= len(self.buffer):
+            val = struct.unpack("<I", self.buffer[self.offset:self.offset+4])[0]
+            self.offset += 4
+            return val
+        return 0
+
     def parse_idlecmd(self):
         """MSG_SELECT_IDLECMD (11) - Main Phase Optionen"""
         player = self.read_byte()
@@ -36,7 +43,7 @@ class YGOByteParser:
         # 1. Normalbeschwörungen (Hand)
         summon_count = self.read_byte()
         for i in range(summon_count):
-            code = self.read_int32()
+            code = self.read_int32() & 0x7FFFFFFF
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
@@ -45,7 +52,7 @@ class YGOByteParser:
         # 2. Spezialbeschwörungen
         spsummon_count = self.read_byte()
         for i in range(spsummon_count):
-            code = self.read_int32()
+            code = self.read_int32() & 0x7FFFFFFF
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
@@ -54,7 +61,7 @@ class YGOByteParser:
         # 3. Reposition / Positionsänderungen
         repos_count = self.read_byte()
         for i in range(repos_count):
-            code = self.read_int32()
+            code = self.read_int32() & 0x7FFFFFFF
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
@@ -63,7 +70,7 @@ class YGOByteParser:
         # 4. Monster verdeckt setzen (MSET)
         mset_count = self.read_byte()
         for i in range(mset_count):
-            code = self.read_int32()
+            code = self.read_int32() & 0x7FFFFFFF
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
@@ -72,7 +79,7 @@ class YGOByteParser:
         # 5. Zauber/Fallen setzen (SSET)
         sset_count = self.read_byte()
         for i in range(sset_count):
-            code = self.read_int32()
+            code = self.read_int32() & 0x7FFFFFFF
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
@@ -85,7 +92,7 @@ class YGOByteParser:
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
-            desc = self.read_int32()
+            desc = self.read_uint32()
             options.append({
                 "type": "ACTIVATE", 
                 "card_id": code, 
@@ -125,7 +132,7 @@ class YGOByteParser:
             con = self.read_byte()
             loc = self.read_byte()
             seq = self.read_byte()
-            desc = self.read_int32()
+            desc = self.read_uint32()
             options.append({"type": "ACTIVATE", "card_id": code, "desc": desc, "sub_idx": i, "con": con, "loc": loc, "seq": seq})
 
         # 2. Angreifbare Monster
@@ -171,7 +178,7 @@ class YGOByteParser:
             loc = (loc_info >> 8) & 0xFF
             seq = (loc_info >> 16) & 0xFF
             pos = (loc_info >> 24) & 0xFF
-            desc = self.read_int32()
+            desc = self.read_uint32()
             loc_name = "in Hand" if loc == 2 else ("auf Feld" if loc in [4, 8] else "im Friedhof" if loc == 16 else "in Zone")
             is_forced = bool(flag2 & 1)
             if is_forced:
@@ -220,7 +227,7 @@ class YGOByteParser:
         count = self.read_byte()
         options = []
         for i in range(count):
-            desc = self.read_int32()
+            desc = self.read_uint32()
             options.append({"type": "OPTION", "desc": desc, "sub_idx": i})
         return {"event": "MSG_SELECT_OPTION", "player": player, "legal_actions": options}
 
@@ -329,7 +336,7 @@ class YGOByteParser:
         con = loc_info & 0xFF
         loc = (loc_info >> 8) & 0xFF
         seq = (loc_info >> 16) & 0xFF
-        desc = self.read_int32()
+        desc = self.read_uint32()
         loc_str = "in der Hand" if loc == 2 else ("auf dem Feld" if loc in [4, 8] else "im Friedhof" if loc == 16 else "in Zone")
         return {
             "event": "MSG_SELECT_EFFECTYN",
@@ -360,7 +367,7 @@ class YGOByteParser:
     def parse_select_yesno(self):
         """MSG_SELECT_YESNO (13) - Ja/Nein Abfrage"""
         player = self.read_byte()
-        desc = self.read_int32()
+        desc = self.read_uint32()
         return {
             "event": "MSG_SELECT_YESNO",
             "player": player,

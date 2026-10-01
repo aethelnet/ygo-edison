@@ -254,7 +254,41 @@ SCENARIOS: Dict[str, Dict[str, Any]] = {
     }
 }
 
+import os
+import json
 import uuid
+
+SCENARIOS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "user_scenarios.json")
+
+def load_persisted_scenarios():
+    """Lädt persistierte Benutzer-Szenarien aus JSON-Datei."""
+    if os.path.exists(SCENARIOS_FILE):
+        try:
+            with open(SCENARIOS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    SCENARIOS.update(data)
+                    print(f"[SCENARIOS]: {len(data)} persistierte Szenarien erfolgreich geladen.")
+        except Exception as e:
+            print(f"[SCENARIOS_ERROR]: Fehler beim Laden von user_scenarios.json: {e}")
+
+def save_persisted_scenarios():
+    """Speichert dynamisch erstellte Szenarien persistent auf Festplatte."""
+    try:
+        os.makedirs(os.path.dirname(SCENARIOS_FILE), exist_ok=True)
+        # Speichere alle Szenarien (oder Custom Checkpoints)
+        custom_scenarios = {k: v for k, v in SCENARIOS.items() if k not in [
+            "quickdraw_synchro", "caius_chain", "heavy_storm_negation",
+            "pot_of_avarice_loop", "brionac_bounce", "lonefire_spore_synchro",
+            "blackwing_vayu", "machina_fortress", "diva_hero"
+        ]}
+        with open(SCENARIOS_FILE, "w", encoding="utf-8") as f:
+            json.dump(custom_scenarios, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[SCENARIOS_ERROR]: Fehler beim Speichern von user_scenarios.json: {e}")
+
+# Initialisiere Persistenz beim Laden des Moduls
+load_persisted_scenarios()
 
 def board_to_scenario(board: Dict[str, Any], title: str = "Replay Checkpoint", description: str = "") -> Dict[str, Any]:
     """Konvertiert einen Board-State (z.B. aus einem Replay-Frame oder Live-Spiel) in ein spielbares Szenario."""
@@ -306,7 +340,16 @@ def board_to_scenario(board: Dict[str, Any], title: str = "Replay Checkpoint", d
         "p1_deck": extract_codes(p1.get("deck", [])) or [29401950, 41420027, 14087893, 63977008, 44095762, 53582587, 9748752, 70095154, 26202165, 70342110, 97919147, 34773082, 94145021, 19613556, 97077563],
     }
     SCENARIOS[sc_id] = scenario
+    save_persisted_scenarios()
     return scenario
+
+def delete_scenario(scenario_id: str) -> bool:
+    """Löscht ein benutzerdefiniertes Szenario."""
+    if scenario_id in SCENARIOS:
+        del SCENARIOS[scenario_id]
+        save_persisted_scenarios()
+        return True
+    return False
 
 
 def get_scenario_metadata_list() -> List[Dict[str, Any]]:

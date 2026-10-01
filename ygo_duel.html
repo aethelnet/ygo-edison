@@ -556,8 +556,8 @@
             box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
         }
 
-        /* 1-CLICK PREFLIGHT & ROOM ERROR MODALS */
-        #preflight-modal, #room-error-modal {
+        /* 1-CLICK PREFLIGHT, MATCH SETUP & ROOM ERROR MODALS */
+        #preflight-modal, #room-error-modal, #match-setup-modal {
             display: none;
             position: fixed;
             top: 0;
@@ -568,7 +568,7 @@
             align-items: center;
             justify-content: center;
         }
-        #preflight-modal.open, #room-error-modal.open {
+        #preflight-modal.open, #room-error-modal.open, #match-setup-modal.open {
             display: flex;
         }
         .preflight-backdrop {
@@ -1247,7 +1247,7 @@
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom: 8px;">
             <h1 style="margin:0;">Auratic Prime // YGO Web Terminal</h1>
             <span style="background: rgba(0, 255, 136, 0.15); border: 1px solid #00ff88; color: #00ff88; font-family: monospace; font-size: 11px; padding: 3px 8px; border-radius: 3px; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 0 8px rgba(0,255,136,0.3);">v1.0-RC1</span>
-            <span style="background: rgba(0, 229, 255, 0.12); border: 1px solid #00e5ff; color: #00e5ff; font-family: monospace; font-size: 10px; padding: 3px 7px; border-radius: 3px; font-weight: bold; letter-spacing: 0.5px;">EDISON STORE ENGINE</span>
+            <span id="hdr-format-badge" onclick="cycleFormat()" style="cursor:pointer; background: rgba(0, 229, 255, 0.2); border: 2px solid #00e5ff; color: #00e5ff; font-family: monospace; font-size: 11px; padding: 4px 10px; border-radius: 4px; font-weight: bold; letter-spacing: 0.8px; box-shadow:0 0 10px rgba(0,229,255,0.4);" title="Klicken zum Umschalten zwischen Modern MR5 und Edison 2010">⚡ REGELWERK: MODERN (MASTER RULE 5) ▾</span>
         </div>
 
         <div style="margin-bottom: 15px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
@@ -1262,12 +1262,82 @@
                 <span style="font-size:10px; color:#00e5ff; opacity:0.8; padding-left:4px;" data-i18n="badge_manage">[MANAGE]</span>
             </div>
         </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <label id="lbl-deck-select" style="color:#aaa;" data-i18n="lbl_deck_select">Deck auswählen: </label>
-            <select id="deck-select" style="background:#111; color:#0f0; border:1px solid #0f0; padding:6px; font-family:monospace; border-radius:3px;">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 12px; background: rgba(18, 18, 26, 0.85); padding: 8px 12px; border-radius: 6px; border: 1px solid #00e5ff; box-shadow: 0 0 10px rgba(0,229,255,0.15);">
+            <label id="lbl-deck-select" style="color:#aaa; font-weight:bold; font-size:12px;" data-i18n="lbl_deck_select">Deck: </label>
+            <select id="deck-select" style="background:#111; color:#0f0; border:1px solid #0f0; padding:6px 10px; font-family:monospace; border-radius:3px; font-weight:bold; min-width:200px;">
                 <option value="">AI Mutation (Randomized)</option>
             </select>
+            
+            <div style="display:inline-flex; align-items:center; gap:8px; margin-left:6px;">
+                <span style="color:#fff; font-size:11px; font-weight:bold; font-family:monospace; letter-spacing:0.5px;">FORMAT:</span>
+                <div id="format-toggle-container" style="display:inline-flex; align-items:center; background:#101018; border:2px solid #00e5ff; border-radius:4px; padding:2px; box-shadow:0 0 12px rgba(0,229,255,0.3);">
+                    <button type="button" id="btn-fmt-modern" onclick="setGameFormat('modern')" style="background:#00e5ff; color:#000; font-weight:bold; font-family:monospace; border:none; padding:6px 14px; border-radius:3px; cursor:pointer; font-size:11px; transition:all 0.2s; box-shadow:0 0 8px #00e5ff;">⚡ MODERN (MR5)</button>
+                    <button type="button" id="btn-fmt-edison" onclick="setGameFormat('edison')" style="background:transparent; color:#888; font-weight:bold; font-family:monospace; border:none; padding:6px 14px; border-radius:3px; cursor:pointer; font-size:11px; transition:all 0.2s;">📜 EDISON (2010)</button>
+                    <input type="hidden" id="format-select" value="modern">
+                </div>
+            </div>
             <script>
+                window.setGameFormat = function(fmt) {
+                    const fSel = document.getElementById("format-select");
+                    if (fSel) fSel.value = fmt;
+                    localStorage.setItem("ygo_format", fmt);
+                    
+                    const btnMod = document.getElementById("btn-fmt-modern");
+                    const btnEd = document.getElementById("btn-fmt-edison");
+                    const hdrBadge = document.getElementById("hdr-format-badge");
+                    const startBtn = document.getElementById("btn-start-duel");
+                    
+                    if (fmt === "modern") {
+                        if (btnMod) {
+                            btnMod.style.background = "#00e5ff";
+                            btnMod.style.color = "#000";
+                            btnMod.style.boxShadow = "0 0 10px #00e5ff";
+                        }
+                        if (btnEd) {
+                            btnEd.style.background = "transparent";
+                            btnEd.style.color = "#888";
+                            btnEd.style.boxShadow = "none";
+                        }
+                        if (hdrBadge) {
+                            hdrBadge.innerText = "⚡ REGELWERK: MODERN (MASTER RULE 5 / LINK / EMZ) ▾";
+                            hdrBadge.style.borderColor = "#00e5ff";
+                            hdrBadge.style.color = "#00e5ff";
+                            hdrBadge.style.background = "rgba(0, 229, 255, 0.2)";
+                            hdrBadge.style.boxShadow = "0 0 10px rgba(0,229,255,0.4)";
+                        }
+                        if (startBtn) {
+                            startBtn.innerText = "Start Duel [⚡ MR5]";
+                        }
+                    } else {
+                        if (btnMod) {
+                            btnMod.style.background = "transparent";
+                            btnMod.style.color = "#888";
+                            btnMod.style.boxShadow = "none";
+                        }
+                        if (btnEd) {
+                            btnEd.style.background = "#f39c12";
+                            btnEd.style.color = "#000";
+                            btnEd.style.boxShadow = "0 0 10px #f39c12";
+                        }
+                        if (hdrBadge) {
+                            hdrBadge.innerText = "📜 REGELWERK: EDISON (APRIL 2010) ▾";
+                            hdrBadge.style.borderColor = "#f39c12";
+                            hdrBadge.style.color = "#f39c12";
+                            hdrBadge.style.background = "rgba(243, 156, 18, 0.2)";
+                            hdrBadge.style.boxShadow = "0 0 10px rgba(243,156,18,0.4)";
+                        }
+                        if (startBtn) {
+                            startBtn.innerText = "Start Duel [📜 Edison]";
+                        }
+                    }
+                };
+
+                window.cycleFormat = function() {
+                    const fSel = document.getElementById("format-select");
+                    const cur = fSel ? fSel.value : "modern";
+                    window.setGameFormat(cur === "modern" ? "edison" : "modern");
+                };
+
                 (function initDeckSelect() {
                     let uid = localStorage.getItem("ygo_user_id");
                     if (!uid || uid === "usr_stefan" || uid === "usr_stefan_001") {
@@ -1289,8 +1359,9 @@
                             data.my_decks.forEach(d => {
                                 const opt = document.createElement("option");
                                 opt.value = d.deck_id || d.deck_name;
-                                const edisonTag = d.is_edison_legal ? " [EDISON]" : "";
-                                opt.innerText = `${d.deck_name}${edisonTag}`;
+                                const fmtTag = d.format_tag || (d.format ? `[${d.format.toUpperCase()}]` : (d.is_edison_legal ? "[EDISON]" : "[MODERN]"));
+                                opt.innerText = `${d.deck_name} ${fmtTag}`;
+                                opt.dataset.format = d.format || (d.is_edison_legal ? "edison" : "modern");
                                 myGroup.appendChild(opt);
                             });
                             sel.appendChild(myGroup);
@@ -1302,9 +1373,10 @@
                             data.community_decks.forEach(d => {
                                 const opt = document.createElement("option");
                                 opt.value = d.deck_id || d.deck_name;
-                                const edisonTag = d.is_edison_legal ? " [EDISON]" : "";
+                                const fmtTag = d.format_tag || (d.format ? `[${d.format.toUpperCase()}]` : (d.is_edison_legal ? "[EDISON]" : "[MODERN]"));
                                 const author = d.user_name ? ` (${d.user_name})` : "";
-                                opt.innerText = `${d.deck_name}${author}${edisonTag}`;
+                                opt.innerText = `${d.deck_name}${author} ${fmtTag}`;
+                                opt.dataset.format = d.format || (d.is_edison_legal ? "edison" : "modern");
                                 commGroup.appendChild(opt);
                             });
                             sel.appendChild(commGroup);
@@ -1318,16 +1390,34 @@
                         const savedDeck = localStorage.getItem("ygo_selected_deck");
                         if (savedDeck && sel.querySelector(`option[value="${savedDeck}"]`)) {
                             sel.value = savedDeck;
+                            const selOpt = sel.options[sel.selectedIndex];
+                            if (selOpt && selOpt.dataset.format) {
+                                window.setGameFormat(selOpt.dataset.format);
+                            } else {
+                                const savedFormat = localStorage.getItem("ygo_format") || "modern";
+                                window.setGameFormat(savedFormat);
+                            }
+                        } else {
+                            const savedFormat = localStorage.getItem("ygo_format") || "modern";
+                            window.setGameFormat(savedFormat);
                         }
+                        
+                        sel.onchange = () => {
+                            localStorage.setItem("ygo_selected_deck", sel.value);
+                            const selOpt = sel.options[sel.selectedIndex];
+                            if (!selOpt || !sel.value) return;
+                            // Auto-promote to modern if deck contains modern cards
+                            const isModernOnly = (selOpt.dataset.format === "modern") && !selOpt.innerText.includes("[EDISON]");
+                            if (isModernOnly) {
+                                window.setGameFormat("modern");
+                            }
+                        };
+
                         if (typeof syncPreflightDeckOptions === "function") {
                             syncPreflightDeckOptions();
                         }
                     })
                     .catch(err => console.log("Deck fetch error:", err));
-
-                    if (typeof loadScenariosList === "function") {
-                        loadScenariosList();
-                    }
                 })();
             </script>
             <select id="mode-select" onchange="onModeChange()" style="background:#111; color:#0f0; border:1px solid #0f0; padding:6px; font-family:monospace; border-radius:3px;">
@@ -1346,6 +1436,7 @@
                 </select>
                 <button id="btn-restart-scenario" onclick="startDuel()" title="Szenario mit gleichem Board neu starten" style="background:#222; color:#f39c12; border:1px solid #f39c12; padding:6px 10px; font-family:monospace; cursor:pointer; border-radius:3px; font-size:11px; font-weight:bold;">[RESET 🔄]</button>
             </div>
+            <button id="btn-match-setup" onclick="openMatchSetupModal()" title="Match Setup: Format (MR5 vs Edison), Gegner-KI Deck, Best-of-3 vs Best-of-1, LP" style="background:#181826; color:#00e5ff; border:1px solid #00e5ff; padding:7px 14px; font-weight:bold; cursor:pointer; border-radius:3px; font-family:monospace; font-size:12px; box-shadow:0 0 10px rgba(0,229,255,0.25);">[⚙️ MATCH SETUP]</button>
             <button id="btn-start-duel" onclick="startDuel()" data-i18n="btn_start_duel" style="background:#0f0; color:#000; border:none; padding:7px 15px; font-weight:bold; cursor:pointer; border-radius:3px;">Start Duel</button>
             <button id="btn-autopilot" onclick="toggleAutopilot()" style="background: #900; color: white; border:none; padding:7px 15px; font-weight:bold; cursor:pointer; border-radius:3px;">Autopilot: OFF</button>
             <button id="btn-tournament-hub" onclick="openTournamentModal()" data-i18n="btn_tournament_hub" style="background:#181826; color:#f39c12; border:1px solid #f39c12; padding:7px 14px; font-weight:bold; cursor:pointer; border-radius:3px; font-family:monospace; font-size:12px; box-shadow:0 0 10px rgba(243,156,18,0.25);">[TURNIERE / LOCALS]</button>
@@ -1827,7 +1918,14 @@
                     );
                     if (matchingAct) {
                         cardItem.classList.add("action-target");
-                        cardItem.title = "Klicken um Aktion auszuführen";
+                        cardItem.style.boxShadow = "0 0 15px #00ff88";
+                        cardItem.style.border = "2px solid #00ff88";
+                        cardItem.style.position = "relative";
+                        cardItem.title = "Klicken um Aktion / Spezialbeschwörung auszuführen";
+                        const summonBadge = document.createElement("div");
+                        summonBadge.style.cssText = "position:absolute; bottom:2px; left:2px; right:2px; background:rgba(0,255,136,0.9); color:#000; font-size:9px; font-weight:bold; text-align:center; border-radius:2px; padding:1px; z-index:5;";
+                        summonBadge.innerText = matchingAct.type === "SPSUMMON" ? "✨ BESCHWÖREN" : "💥 AKTIVIEREN";
+                        cardItem.appendChild(summonBadge);
                         cardItem.onclick = () => {
                             closePileModal();
                             sendActionResponse(matchingAct, currentMsgType);
@@ -2363,24 +2461,41 @@
         let currentActiveRoom = "";
 
         function loadScenariosList() {
-            return fetch('/api/scenarios')
+            const base = (typeof getTournamentApiBase === "function") ? getTournamentApiBase() : "";
+            return fetch(`${base}/api/scenarios`)
                 .then(r => r.json())
                 .then(data => {
                     scenariosCache = data.scenarios || [];
                     const select = document.getElementById("scenario-select");
-                    if (!select) return;
-                    const prevVal = select.value;
-                    select.innerHTML = "";
-                    scenariosCache.forEach(sc => {
-                        const opt = document.createElement("option");
-                        opt.value = sc.id;
-                        opt.textContent = `[${sc.difficulty}] ${sc.title}`;
-                        select.appendChild(opt);
-                    });
-                    if (prevVal && scenariosCache.some(s => s.id === prevVal)) {
-                        select.value = prevVal;
-                    } else if (scenariosCache.length > 0) {
-                        updateScenarioBannerPreview(scenariosCache[0]);
+                    if (select) {
+                        const prevVal = select.value;
+                        select.innerHTML = "";
+                        scenariosCache.forEach(sc => {
+                            const opt = document.createElement("option");
+                            opt.value = sc.id;
+                            opt.textContent = `[${sc.difficulty}] ${sc.title}`;
+                            select.appendChild(opt);
+                        });
+                        if (prevVal && scenariosCache.some(s => s.id === prevVal)) {
+                            select.value = prevVal;
+                        } else if (scenariosCache.length > 0) {
+                            select.value = scenariosCache[0].id;
+                            updateScenarioBannerPreview(scenariosCache[0]);
+                        }
+                    }
+                    const setupSel = document.getElementById("setup-scenario-select");
+                    if (setupSel) {
+                        const prevSetupVal = setupSel.value;
+                        setupSel.innerHTML = "";
+                        scenariosCache.forEach(sc => {
+                            const opt = document.createElement("option");
+                            opt.value = sc.id;
+                            opt.textContent = `[${sc.difficulty}] ${sc.title}`;
+                            setupSel.appendChild(opt);
+                        });
+                        if (prevSetupVal && scenariosCache.some(s => s.id === prevSetupVal)) {
+                            setupSel.value = prevSetupVal;
+                        }
                     }
                     return scenariosCache;
                 })
@@ -2389,6 +2504,9 @@
                     return [];
                 });
         }
+        // Auto-load scenarios on script evaluation
+        loadScenariosList();
+        window.addEventListener('DOMContentLoaded', () => { loadScenariosList(); });
 
         async function snapshotCurrentDuelToScenario() {
             const defaultTitle = `Live Snapshot (Zug ${currentTurn || 1})`;
@@ -2987,6 +3105,218 @@
             startDuel(false, true);
         }
 
+        // ----------------------------------------------------
+        // MATCH SETUP CONTROLLER (Phase 92)
+        // ----------------------------------------------------
+        function openMatchSetupModal() {
+            const modal = document.getElementById("match-setup-modal");
+            if (!modal) return;
+
+            // 1. Sync format
+            const curFmt = localStorage.getItem("ygo_format") || "modern";
+            setSetupFormat(curFmt);
+
+            // 2. Populate user deck select from main deck select
+            const mainSel = document.getElementById("deck-select");
+            const setupDeckSel = document.getElementById("setup-user-deck-select");
+            if (mainSel && setupDeckSel) {
+                setupDeckSel.innerHTML = "";
+                for (let i = 0; i < mainSel.children.length; i++) {
+                    setupDeckSel.appendChild(mainSel.children[i].cloneNode(true));
+                }
+                setupDeckSel.value = mainSel.value;
+            }
+
+            // 3. Match Mode (bo1 vs bo3)
+            const savedMode = localStorage.getItem("ygo_match_mode") || "bo3";
+            const modeBo1 = document.getElementById("setup-mode-bo1");
+            const modeBo3 = document.getElementById("setup-mode-bo3");
+            if (savedMode === "bo1") {
+                if (modeBo1) modeBo1.checked = true;
+            } else {
+                if (modeBo3) modeBo3.checked = true;
+            }
+
+            // 4. Starting LP (8000 vs 4000)
+            const savedLp = localStorage.getItem("ygo_match_lp") || "8000";
+            const lp8k = document.getElementById("setup-lp-8000");
+            const lp4k = document.getElementById("setup-lp-4000");
+            if (savedLp === "4000") {
+                if (lp4k) lp4k.checked = true;
+            } else {
+                if (lp8k) lp8k.checked = true;
+            }
+
+            // 5. Turn Choice (random, first, second)
+            const savedTurn = localStorage.getItem("ygo_match_turn") || "random";
+            const turnSel = document.getElementById("setup-turn-choice");
+            if (turnSel) turnSel.value = savedTurn;
+
+            // 6. Duel Type (solo vs scenario vs pvp)
+            const mainMode = document.getElementById("mode-select");
+            const setupType = document.getElementById("setup-duel-type");
+            if (mainMode && setupType) {
+                setupType.value = mainMode.value;
+                onSetupDuelTypeChange();
+            }
+
+            // 7. Scenarios list sync
+            if (typeof loadScenariosList === "function") {
+                loadScenariosList();
+            }
+
+            modal.classList.add("open");
+            modal.style.display = "flex";
+        }
+
+        function closeMatchSetupModal() {
+            const modal = document.getElementById("match-setup-modal");
+            if (modal) {
+                modal.classList.remove("open");
+                modal.style.display = "none";
+            }
+        }
+
+        function setSetupFormat(fmt) {
+            const isMod = fmt === "modern";
+            const btnMod = document.getElementById("setup-fmt-modern");
+            const btnEd = document.getElementById("setup-fmt-edison");
+            if (btnMod && btnEd) {
+                if (isMod) {
+                    btnMod.style.background = "#00e5ff";
+                    btnMod.style.color = "#000";
+                    btnMod.style.borderColor = "#00e5ff";
+                    btnMod.style.boxShadow = "0 0 10px rgba(0,229,255,0.4)";
+                    btnEd.style.background = "transparent";
+                    btnEd.style.color = "#888";
+                    btnEd.style.borderColor = "#444";
+                    btnEd.style.boxShadow = "none";
+                } else {
+                    btnEd.style.background = "#f39c12";
+                    btnEd.style.color = "#000";
+                    btnEd.style.borderColor = "#f39c12";
+                    btnEd.style.boxShadow = "0 0 10px rgba(243,156,18,0.4)";
+                    btnMod.style.background = "transparent";
+                    btnMod.style.color = "#888";
+                    btnMod.style.borderColor = "#444";
+                    btnMod.style.boxShadow = "none";
+                }
+            }
+            
+            // Update opponent AI deck list based on format
+            const aiDeckSel = document.getElementById("setup-ai-deck-select");
+            if (aiDeckSel) {
+                const savedAi = localStorage.getItem("ygo_match_ai_deck") || "random";
+                aiDeckSel.innerHTML = '<option value="random">🎲 Zufall / Random AI Deck</option>';
+                if (isMod) {
+                    const modDecks = [
+                        { id: "Kashtira_Control", name: "Kashtira Control (Zone-Locking)" },
+                        { id: "osint_tier1_snake_eye", name: "Snake-Eye Tier 1 (Link Climb)" },
+                        { id: "Tearlaments_Full_Power", name: "Tearlaments Full Power (Fusion-Mill)" },
+                        { id: "Pure_PUNK", name: "Pure P.U.N.K. (Synchro Explosion)" }
+                    ];
+                    modDecks.forEach(d => {
+                        const opt = document.createElement("option");
+                        opt.value = d.id;
+                        opt.innerText = `🤖 ${d.name}`;
+                        if (savedAi === d.id) opt.selected = true;
+                        aiDeckSel.appendChild(opt);
+                    });
+                } else {
+                    const edDecks = [
+                        { id: "Edison_Quickdraw_Dandy", name: "Quickdraw Dandy (Synchro Climb)" },
+                        { id: "Edison_Blackwing", name: "Blackwing Vayu (Aggro / Synchro)" },
+                        { id: "Edison_Machina_Gadget", name: "Machina Gadget (Control Beatdown)" },
+                        { id: "Edison_Diva_HERO", name: "Diva HERO (Miracle Fusion / Catastor)" }
+                    ];
+                    edDecks.forEach(d => {
+                        const opt = document.createElement("option");
+                        opt.value = d.id;
+                        opt.innerText = `🤖 ${d.name}`;
+                        if (savedAi === d.id) opt.selected = true;
+                        aiDeckSel.appendChild(opt);
+                    });
+                }
+            }
+        }
+
+        function onSetupDuelTypeChange() {
+            const setupType = document.getElementById("setup-duel-type");
+            const type = setupType ? setupType.value : "solo";
+            const aiRow = document.getElementById("setup-row-ai-deck");
+            const scenRow = document.getElementById("setup-row-scenario");
+            const pvpRow = document.getElementById("setup-row-pvp");
+            
+            if (aiRow) aiRow.style.display = (type === "solo") ? "block" : "none";
+            if (scenRow) scenRow.style.display = (type === "scenario") ? "block" : "none";
+            if (pvpRow) pvpRow.style.display = (type === "pvp") ? "block" : "none";
+        }
+
+        function confirmAndStartFromMatchSetup() {
+            // 1. Get chosen format
+            const btnMod = document.getElementById("setup-fmt-modern");
+            const chosenFormat = (btnMod && (btnMod.style.background.includes("rgb(0, 229, 255)") || btnMod.style.background.includes("#00e5ff"))) ? "modern" : "edison";
+            window.setGameFormat(chosenFormat);
+
+            // 2. Get chosen deck
+            const setupDeckSel = document.getElementById("setup-user-deck-select");
+            const mainSel = document.getElementById("deck-select");
+            if (setupDeckSel && mainSel && setupDeckSel.value) {
+                mainSel.value = setupDeckSel.value;
+                localStorage.setItem("ygo_selected_deck", setupDeckSel.value);
+            }
+
+            // 3. Get duel type
+            const setupType = document.getElementById("setup-duel-type");
+            const mainMode = document.getElementById("mode-select");
+            if (setupType && mainMode) {
+                mainMode.value = setupType.value;
+                onModeChange();
+            }
+
+            // 4. Save AI Deck
+            const aiDeckSel = document.getElementById("setup-ai-deck-select");
+            if (aiDeckSel) {
+                localStorage.setItem("ygo_match_ai_deck", aiDeckSel.value);
+            }
+
+            // 5. Match mode (bo1 vs bo3)
+            const modeBo1 = document.getElementById("setup-mode-bo1");
+            const matchMode = (modeBo1 && modeBo1.checked) ? "bo1" : "bo3";
+            localStorage.setItem("ygo_match_mode", matchMode);
+
+            // 6. Starting LP
+            const lp4k = document.getElementById("setup-lp-4000");
+            const startLp = (lp4k && lp4k.checked) ? "4000" : "8000";
+            localStorage.setItem("ygo_match_lp", startLp);
+
+            // 7. Turn choice
+            const turnSel = document.getElementById("setup-turn-choice");
+            if (turnSel) {
+                localStorage.setItem("ygo_match_turn", turnSel.value);
+            }
+
+            // 8. Scenario selection if in scenario mode
+            if (setupType && setupType.value === "scenario") {
+                const setupScenSel = document.getElementById("setup-scenario-select");
+                const mainScenSel = document.getElementById("scenario-select");
+                if (setupScenSel && mainScenSel && setupScenSel.value) {
+                    mainScenSel.value = setupScenSel.value;
+                    onScenarioSelectChange();
+                }
+            } else if (setupType && setupType.value === "pvp") {
+                const roomIn = document.getElementById("setup-pvp-room-code");
+                const mainRoomIn = document.getElementById("room-input");
+                if (roomIn && mainRoomIn && roomIn.value.trim()) {
+                    mainRoomIn.value = roomIn.value.trim();
+                }
+            }
+
+            // Close modal & launch duel
+            closeMatchSetupModal();
+            startDuel();
+        }
+
         function showRoomErrorModal(message, errorType) {
             const modal = document.getElementById("room-error-modal");
             if (!modal) return;
@@ -3229,28 +3559,38 @@
             if (!modal || !btnsEl) return;
             
             const targetAct = (actionItems && actionItems.length > 0 && actionItems[0].act) ? actionItems[0].act : (act || {});
-            const cardName = targetAct.name || (targetAct.card_id ? "Karte #" + targetAct.card_id : "Gewählte Karte");
-            if (titleEl) titleEl.innerText = `[AKTION WÄHLEN // ${cardName.toUpperCase()}]`;
+            const distinctNames = [...new Set(actionItems.map(i => i.act.name || i.act.card_id).filter(Boolean))];
+            if (distinctNames.length > 1) {
+                const isExtra = actionItems.some(i => i.act.loc === 64 || i.act.type === "SPSUMMON");
+                titleEl.innerText = isExtra 
+                    ? `[EXTRA DECK BESCHWÖRUNG // ${actionItems.length} OPTIONEN]`
+                    : `[AKTION WÄHLEN // ${actionItems.length} OPTIONEN]`;
+            } else {
+                const cardName = targetAct.name || (targetAct.card_id ? "Karte #" + targetAct.card_id : "Gewählte Karte");
+                titleEl.innerText = `[AKTION WÄHLEN // ${cardName.toUpperCase()}]`;
+            }
             btnsEl.innerHTML = "";
             
             actionItems.forEach(item => {
                 const btn = document.createElement("button");
-                btn.style.cssText = "background:#141422; border:1px solid #00e5ff; color:#fff; padding:12px 14px; font-family:monospace; font-weight:bold; font-size:13px; text-align:left; cursor:pointer; border-radius:4px; transition:all 0.15s ease; display:flex; justify-content:space-between; align-items:center;";
+                btn.style.cssText = "background:#141422; border:1px solid #00e5ff; color:#fff; padding:10px 14px; font-family:monospace; font-weight:bold; font-size:13px; text-align:left; cursor:pointer; border-radius:4px; transition:all 0.15s ease; display:flex; justify-content:space-between; align-items:center; gap:8px;";
                 
-                let label = item.act.name || item.act.type;
+                const cid = (item.act.card_id || 0) & 0x7FFFFFFF;
+                const cname = item.act.name || (cid > 0 ? "Karte #" + cid : "");
+                let label = cname || item.act.type;
                 let badgeColor = "#00e5ff";
                 let badgeText = item.act.type;
                 
                 if (item.act.type === "ACTIVATE") {
-                    label = "💥 EFFEKT AKTIVIEREN" + (item.act.desc_text ? `: ${item.act.desc_text}` : "");
+                    label = "💥 EFFEKT" + (item.act.desc_text ? `: ${item.act.desc_text}` : (cname ? `: ${cname}` : ""));
                     badgeColor = "#e67e22";
                     badgeText = "EFFEKT";
                 } else if (item.act.type === "ACTIVATE_CHAIN") {
-                    label = "⚡ ANKETTEN" + (item.act.desc_text ? `: ${item.act.desc_text}` : (item.act.name ? `: ${item.act.name}` : ""));
+                    label = "⚡ ANKETTEN" + (item.act.desc_text ? `: ${item.act.desc_text}` : (cname ? `: ${cname}` : ""));
                     badgeColor = "#9b59b6";
                     badgeText = item.act.forced ? "PFLICHT" : "KETTE";
                 } else if (item.act.type === "EFFECT_YES") {
-                    label = "💥 EFFEKT AKTIVIEREN" + (item.act.desc_text ? `: ${item.act.desc_text}` : "");
+                    label = "💥 EFFEKT AKTIVIEREN" + (item.act.desc_text ? `: ${item.act.desc_text}` : (cname ? `: ${cname}` : ""));
                     badgeColor = "#e67e22";
                     badgeText = "TRIGGER";
                 } else if (item.act.type === "EFFECT_NO") {
@@ -3258,37 +3598,48 @@
                     badgeColor = "#7f8c8d";
                     badgeText = "PASS";
                 } else if (item.act.type === "REPOS") {
-                    label = "🔄 POSITION ÄNDERN";
+                    label = "🔄 POSITION ÄNDERN" + (cname ? `: ${cname}` : "");
                     badgeColor = "#3498db";
                     badgeText = "POSITION";
                 } else if (item.act.type === "ATTACK") {
-                    label = "⚔️ ANGRIFF DEKLARIEREN";
+                    label = "⚔️ ANGRIFF DEKLARIEREN" + (cname ? `: ${cname}` : "");
                     badgeColor = "#e74c3c";
                     badgeText = "BATTLE";
                 } else if (item.act.type === "SUMMON") {
-                    label = "⚡ NORMALBESCHWÖRUNG";
+                    label = "⚡ NORMALBESCHWÖRUNG" + (cname ? `: ${cname}` : "");
                     badgeColor = "#2ecc71";
                     badgeText = "SUMMON";
                 } else if (item.act.type === "MSET") {
-                    label = "🛡️ VERDECKT SETZEN (MSET)";
+                    label = "🛡️ VERDECKT SETZEN (MSET)" + (cname ? `: ${cname}` : "");
                     badgeColor = "#95a5a6";
-                    badgeText = "SET";
+                    badgeText = "MSET";
                 } else if (item.act.type === "SSET") {
-                    label = "📜 VERDECKT SETZEN (SSET)";
+                    label = "📜 VERDECKT SETZEN (SSET)" + (cname ? `: ${cname}` : "");
                     badgeColor = "#95a5a6";
-                    badgeText = "SET";
+                    badgeText = "SSET";
                 } else if (item.act.type === "SPSUMMON") {
-                    label = "✨ SPEZIALBESCHWÖRUNG";
+                    label = "✨ BESCHWÖREN" + (cname ? `: ${cname}` : "");
                     badgeColor = "#9b59b6";
                     badgeText = "SP-SUMMON";
                 } else if (item.act.type === "SELECT_UNSELECT") {
-                    label = "🎯 KARTE WÄHLEN / ABWÄHLEN";
+                    label = "🎯 WÄHLEN / ABWÄHLEN" + (cname ? `: ${cname}` : "");
                     badgeColor = "#00e5ff";
                     badgeText = "SELECT";
                 }
                 
-                btn.innerHTML = `<span>${label}</span><span style="font-size:10px; background:${badgeColor}; color:#000; padding:2px 6px; border-radius:2px; font-weight:bold;">${badgeText}</span>`;
-                btn.onmouseover = () => { btn.style.background = "#00e5ff"; btn.style.color = "#000"; };
+                let thumbHtml = "";
+                if (cid > 0) {
+                    thumbHtml = `<img src="https://images.ygoprodeck.com/images/cards_small/${cid}.jpg" style="width:28px; height:41px; object-fit:cover; border-radius:2px; margin-right:8px; border:1px solid #333; flex-shrink:0;" onerror="this.style.display='none'">`;
+                }
+                
+                btn.innerHTML = `<div style="display:flex; align-items:center; min-width:0; flex:1;">${thumbHtml}<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span></div><span style="font-size:10px; background:${badgeColor}; color:#000; padding:2px 6px; border-radius:2px; font-weight:bold; margin-left:8px; flex-shrink:0;">${badgeText}</span>`;
+                btn.onmouseover = () => { 
+                    btn.style.background = "#00e5ff"; 
+                    btn.style.color = "#000"; 
+                    if (item.act.card_id && typeof updateCardPreview === "function") {
+                        updateCardPreview(item.act);
+                    }
+                };
                 btn.onmouseout = () => { btn.style.background = "#141422"; btn.style.color = "#fff"; };
                 btn.onclick = (e) => {
                     closeCardActionModal();
@@ -3296,6 +3647,22 @@
                 };
                 btnsEl.appendChild(btn);
             });
+            
+            // If any action is from Extra Deck, offer a button to view the entire Extra Deck
+            const hasExtraAct = actionItems.some(i => i.act.loc === 64 || i.act.type === "SPSUMMON");
+            if (hasExtraAct) {
+                const viewBtn = document.createElement("button");
+                viewBtn.style.cssText = "background:#0a1a1f; border:1px dashed #00e5ff; color:#00e5ff; padding:10px; font-family:monospace; font-weight:bold; font-size:12px; cursor:pointer; border-radius:4px; margin-top:6px; transition:all 0.15s ease;";
+                viewBtn.innerText = "👁️ Extra Deck öffnen & ansehen";
+                viewBtn.onmouseover = () => { viewBtn.style.background = "#00e5ff"; viewBtn.style.color = "#000"; };
+                viewBtn.onmouseout = () => { viewBtn.style.background = "#0a1a1f"; viewBtn.style.color = "#00e5ff"; };
+                viewBtn.onclick = () => {
+                    closeCardActionModal();
+                    const extraCards = (lastBoardState && lastBoardState[0] && lastBoardState[0].extra) || [];
+                    openPileModal("user-extra", "EXTRA DECK (DEINES)", extraCards);
+                };
+                btnsEl.appendChild(viewBtn);
+            }
             
             modal.style.display = "flex";
         }
@@ -5140,7 +5507,7 @@
                     const modeSelect = document.getElementById("mode-select");
                     if (modeSelect) {
                         modeSelect.value = "scenario";
-                        onModeSelectChange();
+                        onModeChange();
                     }
                     const scenSelect = document.getElementById("scenario-select");
                     if (scenSelect) {
@@ -6198,6 +6565,24 @@
                 queryParams.push("referee_pin=" + encodeURIComponent(window.getRefereePin()));
             }
 
+            // Include chosen game format (modern vs edison)
+            const fSel = document.getElementById("format-select");
+            const activeFormat = fSel ? fSel.value : "modern";
+            queryParams.push("format=" + encodeURIComponent(activeFormat));
+
+            // Include match setup options
+            const aiDeck = localStorage.getItem("ygo_match_ai_deck");
+            if (aiDeck && aiDeck !== "random") queryParams.push("ai_deck=" + encodeURIComponent(aiDeck));
+
+            const matchMode = localStorage.getItem("ygo_match_mode") || "bo3";
+            queryParams.push("match_mode=" + encodeURIComponent(matchMode));
+
+            const startLp = localStorage.getItem("ygo_match_lp") || "8000";
+            queryParams.push("lp=" + encodeURIComponent(startLp));
+
+            const turnChoice = localStorage.getItem("ygo_match_turn") || "random";
+            if (turnChoice !== "random") queryParams.push("turn_choice=" + encodeURIComponent(turnChoice));
+
             if (queryParams.length > 0) wsUrl += "?" + queryParams.join("&");
             
             // Show surrender and snapshot button and arm it for players
@@ -7059,7 +7444,7 @@
                     } else if (isChainPrompt && hasForcedChain) {
                         statusEl.innerHTML = `<span style="color:#e74c3c; font-weight:bold;">[PFLICHT-TRIGGER]: Ketten-Effekt zwingend auszulösen (Passen nach Regeln verboten):</span>`;
                     } else if (isChainPrompt) {
-                        statusEl.innerHTML = `<span style="color:#9b59b6; font-weight:bold;">[KETTEN-PRIORITÄT]: Möchtest du eine Karte oder einen Schnelleffekt anketten?</span>`;
+                        statusEl.innerHTML = `<span style="color:#9b59b6; font-weight:bold;">[KETTEN-PRIORITÄT]: Möchtest du einen Schnelleffekt anketten? (Wenn nicht, klicke '[EFFEKT AUFLÖSEN]' um fortzufahren)</span>`;
                     } else if (data.msg_type === 18) {
                         statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[ZONEN-AUSWAHL]: Klicke auf eine freie Zone auf deinem Spielfeld:</span>`;
                     } else if (data.msg_type === 24) {
@@ -7083,8 +7468,20 @@
                     } else if (data.msg_type === 13) {
                         const qText = p.desc_text || "Möchtest du diese Aktion ausführen?";
                         statusEl.innerHTML = `<span style="color:#ff0; font-weight:bold;">[FRAGE] ${qText}</span>`;
-                    } else if (data.msg_type === 15 && actions.some(a => a.is_tuner)) {
+                    } else if (data.msg_type === 15 && actions.length > 0 && actions.some(a => a.is_tuner && a.loc === 4)) {
                         statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[SCHRITT 1 - SYNCHRO]: Wähle 1 Empfänger (Tuner) auf dem Spielfeld:</span>`;
+                    } else if (data.msg_type === 15 && actions.length > 0 && actions.every(a => a.loc === 2)) {
+                        statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[HAND-KARTEN AUSWAHL]: Wähle ${minCards === maxCards ? minCards : (minCards + '-' + maxCards)} Karte(n) aus deiner Hand:</span>`;
+                    } else if (data.msg_type === 15 && actions.length > 0 && actions.every(a => a.loc === 1)) {
+                        statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[DECK-AUSWAHL]: Wähle ${minCards === maxCards ? minCards : (minCards + '-' + maxCards)} Karte(n) aus deinem Deck:</span>`;
+                    } else if (data.msg_type === 15 && actions.length > 0 && actions.every(a => a.loc === 16)) {
+                        statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[FRIEDHOF-AUSWAHL]: Wähle ${minCards === maxCards ? minCards : (minCards + '-' + maxCards)} Karte(n) aus dem Friedhof:</span>`;
+                    } else if (data.msg_type === 15 && actions.length > 0 && actions.every(a => a.loc === 4)) {
+                        statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[FELD-ZIEL]: Wähle ${minCards === maxCards ? minCards : (minCards + '-' + maxCards)} Karte(n) auf dem Spielfeld:</span>`;
+                    } else if (data.msg_type === 26) {
+                        const canFinish = p.finishable;
+                        const finishHint = canFinish ? " (oder klicke '[Auswahl abschließen]')" : "";
+                        statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[EXTRA DECK / SYNCHRO MATERIAL]: Klicke das Material auf dem Spielfeld an${finishHint}:</span>`;
                     } else if (isMulti) {
                         statusEl.innerHTML = `<span style="color:#00e5ff; font-weight:bold;">[MATERIAL-AUSWAHL]: Wähle zwischen ${minCards} und ${maxCards} Karten:</span>`;
                     } else {
@@ -7401,14 +7798,14 @@
                                 const actionPrefix = isSegoc ? "Als Kettenglied wählen: " : "Anketten: ";
                                 name = `${badge}${actionPrefix}<b>${act.name || act.card_id}</b>${locTag}`;
                             } else if (act.type === "CANCEL_CHAIN") {
-                                name = `<span style="color:#e74c3c; font-weight:bold;">[PASSEN]</span> Kette nicht fortsetzen (Priorität abgeben)`;
+                                name = `<span style="color:#2ecc71; font-weight:bold;">▶ [EFFEKT AUFLÖSEN]</span> Nicht anketten (Effekt ausführen & fortfahren)`;
                             }
                             else if (act.type === "POS_FACEUP_ATTACK") name = "[ATK] Offene Angriffsposition";
                             else if (act.type === "POS_FACEUP_DEFENSE") name = "[DEF] Offene Verteidigungsposition";
                             else if (act.type === "SELECT_SUM_CARD") {
                                 const valStr = act.op1 ? ` (★${act.op1})` : "";
                                 name = `Material: ${act.name || act.card_id}${valStr}`;
-                            } else if (act.type === "TARGET_CARD" && act.is_tuner) {
+                            } else if (act.type === "TARGET_CARD" && act.is_tuner && act.loc === 4) {
                                 name = `Empfänger (Tuner): ${act.name || act.card_id}`;
                             } else if (act.type === "SELECT_TRIBUTE") {
                                 name = `Tribut: ${act.name || act.card_id}`;
@@ -7665,6 +8062,123 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DUELL & MATCH SETUP MODAL (Phase 92) -->
+    <div id="match-setup-modal">
+        <div class="preflight-backdrop" onclick="closeMatchSetupModal()"></div>
+        <div class="preflight-card" style="max-width: 580px; max-height: 90vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1a1a2e; padding-bottom:10px; margin-bottom:14px;">
+                <div style="font-size:14px; font-weight:bold; color:#00e5ff; letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+                    <span>⚙️</span> [MATCH SETUP // DUELL-KONFIGURATION]
+                </div>
+                <button type="button" onclick="closeMatchSetupModal()" style="background:none; border:none; color:#888; font-size:16px; cursor:pointer;">✕</button>
+            </div>
+
+            <!-- REGELWERK / FORMAT -->
+            <div style="margin-bottom:16px; background:#12121c; padding:12px; border-radius:4px; border:1px solid #222238;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#00e5ff; margin-bottom:8px; letter-spacing:0.5px;">1. REGELWERK & FORMAT (MASTER RULE):</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <button type="button" id="setup-fmt-modern" onclick="setSetupFormat('modern')" style="background:#00e5ff; color:#000; border:1px solid #00e5ff; padding:10px 12px; font-family:monospace; font-weight:bold; font-size:12px; border-radius:4px; cursor:pointer; text-align:left; box-shadow:0 0 10px rgba(0,229,255,0.3);">
+                        <div>⚡ MODERN (MR5)</div>
+                        <div style="font-size:10px; font-weight:normal; opacity:0.8; margin-top:3px;">Link, Xyz, Pendel, EMZ, Moderne Trigger</div>
+                    </button>
+                    <button type="button" id="setup-fmt-edison" onclick="setSetupFormat('edison')" style="background:transparent; color:#888; border:1px solid #444; padding:10px 12px; font-family:monospace; font-weight:bold; font-size:12px; border-radius:4px; cursor:pointer; text-align:left;">
+                        <div>📜 EDISON (2010)</div>
+                        <div style="font-size:10px; font-weight:normal; opacity:0.8; margin-top:3px;">Ignition-Priority, April 2010 Banlist</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- DUELL-MODUS -->
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">2. DUELL-MODUS:</label>
+                <select id="setup-duel-type" onchange="onSetupDuelTypeChange()" style="width:100%; background:#12121c; color:#00ff88; border:1px solid #00ff88; padding:8px 12px; font-family:monospace; border-radius:3px; font-size:12px; font-weight:bold;">
+                    <option value="solo">Solo vs KI (PROPHIT-AI)</option>
+                    <option value="scenario">Taktik-Szenario / Daily Puzzle 🧩</option>
+                    <option value="pvp">1v1 PvP (Multiplayer Raum)</option>
+                </select>
+            </div>
+
+            <!-- DEIN DECK -->
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">3. DEIN DECK (ACCOUNT / COMMUNITY):</label>
+                <select id="setup-user-deck-select" style="width:100%; background:#12121c; color:#00e5ff; border:1px solid #00e5ff; padding:8px 12px; font-family:monospace; border-radius:3px; font-size:12px; font-weight:bold;">
+                    <option value="">Lade Decks...</option>
+                </select>
+            </div>
+
+            <!-- GEGNER KI DECK (SOLO) -->
+            <div id="setup-row-ai-deck" style="margin-bottom:14px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">4. GEGNER-KI DECK (ARCHETYP):</label>
+                <select id="setup-ai-deck-select" style="width:100%; background:#12121c; color:#f39c12; border:1px solid #f39c12; padding:8px 12px; font-family:monospace; border-radius:3px; font-size:12px; font-weight:bold;">
+                    <option value="random">🎲 Zufall / Random AI Deck</option>
+                </select>
+            </div>
+
+            <!-- TAKTIK SZENARIO (SCENARIO MODE) -->
+            <div id="setup-row-scenario" style="display:none; margin-bottom:14px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">4. PUZZLE / SZENARIO AUSWÄHLEN:</label>
+                <select id="setup-scenario-select" style="width:100%; background:#12121c; color:#f39c12; border:1px solid #f39c12; padding:8px 12px; font-family:monospace; border-radius:3px; font-size:12px; font-weight:bold;">
+                    <option value="">Lade Szenarien...</option>
+                </select>
+            </div>
+
+            <!-- PVP RAUM (PVP MODE) -->
+            <div id="setup-row-pvp" style="display:none; margin-bottom:14px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">4. PVP RAUM-CODE:</label>
+                <div style="display:flex; gap:8px;">
+                    <input id="setup-pvp-room-code" type="text" placeholder="Raum-Code (z.B. edison_vayu)" style="flex:1; background:#12121c; color:#00e5ff; border:1px solid #00e5ff; padding:8px 12px; font-family:monospace; border-radius:3px; font-size:12px;">
+                    <button type="button" onclick="const r = generateRandomRoomCode(); document.getElementById('setup-pvp-room-code').value = r;" style="background:#181826; color:#00e5ff; border:1px solid #00e5ff; padding:8px 12px; font-family:monospace; font-size:11px; cursor:pointer; border-radius:3px;">[NEU]</button>
+                </div>
+            </div>
+
+            <!-- MATCH FORMAT & LEBENSPUNKTE -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; background:#101018; padding:10px 12px; border-radius:4px; border:1px solid #20202e;">
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">5. MATCH-FORMAT:</label>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <label style="font-size:12px; color:#fff; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <input type="radio" id="setup-mode-bo3" name="setup_match_mode" value="bo3" checked> Best-of-3 (Match + Side)
+                        </label>
+                        <label style="font-size:12px; color:#fff; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <input type="radio" id="setup-mode-bo1" name="setup_match_mode" value="bo1"> Best-of-1 (Single Game)
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">6. START-LEBENSPUNKTE:</label>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <label style="font-size:12px; color:#fff; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <input type="radio" id="setup-lp-8000" name="setup_lp" value="8000" checked> 8000 LP (Standard)
+                        </label>
+                        <label style="font-size:12px; color:#fff; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <input type="radio" id="setup-lp-4000" name="setup_lp" value="4000"> 4000 LP (Speed Duel)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERSTER ZUG -->
+            <div style="margin-bottom:18px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#888; margin-bottom:6px;">7. ZUGREIHENFOLGE (WER BEGINNT):</label>
+                <select id="setup-turn-choice" style="width:100%; background:#12121c; color:#fff; border:1px solid #444; padding:8px 12px; font-family:monospace; border-radius:3px; font-size:12px;">
+                    <option value="random">🎲 Zufall (Münzwurf / Random)</option>
+                    <option value="first">🔵 Ich beginne (Turn 1)</option>
+                    <option value="second">🔴 Gegner beginnt (Turn 2)</option>
+                </select>
+            </div>
+
+            <!-- BUTTONS -->
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                <button type="button" onclick="closeMatchSetupModal()" style="background:#222; color:#888; border:1px solid #444; padding:10px 16px; cursor:pointer; font-family:monospace; border-radius:3px; font-size:12px;">
+                    [ABBRECHEN]
+                </button>
+                <button type="button" onclick="confirmAndStartFromMatchSetup()" style="flex:1; background:#00e5ff; color:#000; border:none; padding:12px 20px; cursor:pointer; font-family:monospace; border-radius:3px; font-weight:bold; font-size:13px; box-shadow:0 0 15px rgba(0,229,255,0.4); text-transform:uppercase;">
+                    [⚔️ DUELL STARTEN MIT SETUP]
+                </button>
             </div>
         </div>
     </div>
