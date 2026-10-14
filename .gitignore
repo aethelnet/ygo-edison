@@ -20,3 +20,5 @@ CMakeCache.txt
 obj/
 bin/
 script/
+
+telemetry/*.jsonl

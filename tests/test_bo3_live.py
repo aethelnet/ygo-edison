@@ -1,11 +1,16 @@
 import asyncio
 import json
-import websockets
+import os
 import sys
+import unittest
+import websockets
 
-SERVER_WS = "wss://play.aethelburg.network/ws"
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from test_room_capacity import _ensure_ws_server
 
-async def test_solo_bo3():
+
+async def _run_solo_bo3(SERVER_WS: str):
     print("\n==========================================")
     print(">>> TEST 1: SOLO BEST-OF-3 vs AI")
     print("==========================================")
@@ -131,7 +136,7 @@ async def test_solo_bo3():
         
         print("✓ SOLO BEST-OF-3 VERIFICATION 100% SUCCESSFUL!")
 
-async def test_pvp_bo3():
+async def _run_pvp_bo3(SERVER_WS: str):
     print("\n==========================================")
     print(">>> TEST 2: PvP BEST-OF-3 (2 HUMANS)")
     print("==========================================")
@@ -265,9 +270,17 @@ async def test_pvp_bo3():
             print(f"✓ MATCH_END received: Winner {end_p0.get('winner_name')}, Reason: {end_p0.get('reason')}")
             print("✓ PvP BEST-OF-3 VERIFICATION 100% SUCCESSFUL!")
 
-async def main():
-    await test_solo_bo3()
-    await test_pvp_bo3()
+
+class TestBo3Live(unittest.TestCase):
+    def test_solo_bo3(self):
+        with _ensure_ws_server() as server_ws:
+            asyncio.run(_run_solo_bo3(server_ws))
+
+    def test_pvp_bo3(self):
+        with _ensure_ws_server() as server_ws:
+            asyncio.run(_run_pvp_bo3(server_ws))
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    unittest.main()
+
