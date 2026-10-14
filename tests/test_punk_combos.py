@@ -192,7 +192,6 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
 
         self.assertTrue(synchro_success, "Synchro Summon of Dragon Drive should succeed without retries or errors")
 
-    @unittest.expectedFailure
     def test_foxy_tune_deck_special(self):
         """Verifies Noh-P.U.N.K. Foxy Tune discard from hand to Special Summon P.U.N.K. from Deck."""
         pduel = self.ocg.create_duel(42002)
@@ -261,7 +260,6 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
 
         self.assertTrue(deck_summon_success, "Foxy Tune Deck-Special effect should resolve and summon from Deck")
 
-    @unittest.expectedFailure
     def test_fusion_rising_carp(self):
         """Verifies Ukiyoe-P.U.N.K. Sharakusai Fusion Summon into Ukiyoe-P.U.N.K. Rising Carp."""
         pduel = self.ocg.create_duel(42003)
@@ -330,7 +328,6 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
 
         self.assertTrue(fusion_success, "Rising Carp should be successfully Fusion Summoned via Sharakusai")
 
-    @unittest.expectedFailure
     def test_xyz_break_sword(self):
         """Verifies Rank 3 Xyz Summon of The Phantom Knights of Break Sword using Ze Amin (L3) + Madame Spider (L3)."""
         pduel = self.ocg.create_duel(42010)
@@ -368,6 +365,12 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
                 if sps:
                     resp = (sps[0]["sub_idx"] << 16) | 1
                     self.ocg.set_responsei(pduel, resp)
+            elif mtype == 15:
+                resp_arr = bytearray(64)
+                resp_arr[0] = 2
+                resp_arr[1] = 0
+                resp_arr[2] = 1
+                self.ocg.set_responseb(pduel, ctypes.create_string_buffer(bytes(resp_arr), 64))
             elif mtype == 26:
                 resp_arr = bytearray(64)
                 resp_arr[0] = 1
@@ -390,7 +393,6 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
 
         self.assertTrue(xyz_success, "Break Sword should be successfully Xyz Summoned")
 
-    @unittest.expectedFailure
     def test_xyz_zombie_vampire(self):
         """Verifies Rank 8 Xyz Summon of The Zombie Vampire using Foxy Tune (L8) + Ogre Dance (L8)."""
         pduel = self.ocg.create_duel(42012)
@@ -428,6 +430,12 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
                 if sps:
                     resp = (sps[0]["sub_idx"] << 16) | 1
                     self.ocg.set_responsei(pduel, resp)
+            elif mtype == 15:
+                resp_arr = bytearray(64)
+                resp_arr[0] = 2
+                resp_arr[1] = 0
+                resp_arr[2] = 1
+                self.ocg.set_responseb(pduel, ctypes.create_string_buffer(bytes(resp_arr), 64))
             elif mtype == 26:
                 resp_arr = bytearray(64)
                 resp_arr[0] = 1
@@ -450,7 +458,6 @@ class TestPunkCombosAndExtraDeck(unittest.TestCase):
 
         self.assertTrue(xyz_success, "The Zombie Vampire should be successfully Xyz Summoned")
 
-    @unittest.expectedFailure
     def test_link_sp_little_knight(self):
         """Verifies Link 2 Summon of S:P Little Knight using Ze Amin + Sharakusai."""
         pduel = self.ocg.create_duel(42013)
