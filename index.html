@@ -8389,5 +8389,19 @@
             </div>
         </div>
     </div>
+
+    <div id="play-legal-widget" style="position:fixed;bottom:8px;right:12px;z-index:9990;font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:10px;">
+      <button type="button" onclick="document.getElementById('play-legal-modal').style.display='flex'" style="background:#111827;color:#f8fafc;border:1px solid #475569;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:10px;opacity:0.85;">IMPRESSUM &amp; DATENSCHUTZ (§ 5 DDG)</button>
+    </div>
+    <div id="play-legal-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:16px;font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:12px;line-height:1.55;color:#111827;">
+      <div style="background:#ffffff;border:2px solid #111827;box-shadow:6px 6px 0 #111827;max-width:580px;width:100%;padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #111827;padding-bottom:10px;margin-bottom:12px;">
+          <strong>IMPRESSUM &amp; DATENSCHUTZ (§ 5 DDG / DSGVO)</strong>
+          <button type="button" onclick="document.getElementById('play-legal-modal').style.display='none'" style="background:#ffffff;color:#111827;border:1px solid #111827;padding:2px 8px;cursor:pointer;font-family:inherit;">[X]</button>
+        </div>
+        <p style="margin:0 0 12px 0;"><strong>1. Angaben gemäß § 5 DDG:</strong><br/>Niklas Herlyn — Aethelnet / Auratic Systems<br/>Taunusblick 10, 61191 Rosbach v. d. Höhe, Deutschland<br/>E-Mail: nika.hrlyn@gmail.com<br/>Verantwortlich i.S.d. § 18 Abs. 2 MStV: Niklas Herlyn (Anschrift wie oben)</p>
+        <p style="margin:0;"><strong>2. Datenschutzerklärung (DSGVO):</strong><br/>Diese Web-Anwendung arbeitet lokal im Browser (Local-First) ohne Cookies, ohne Google Fonts und ohne Tracking/Analytics. Das statische Hosting erfolgt über GitHub Pages (GitHub, Inc.), wobei technisch notwendige Server-Logfiles (IP-Adresse, Zeitstempel) gemäß Art. 6 Abs. 1 lit. f DSGVO zur sicheren Auslieferung verarbeitet werden.</p>
+      </div>
+    </div>
 </body>
 </html>
